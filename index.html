@@ -31,6 +31,11 @@
      alter table votes    enable row level security;
      create policy "allow all" on sessions for all using (true) with check (true);
      create policy "allow all" on votes    for all using (true) with check (true);
+
+     -- IMPORTANT: enable Realtime so live updates work across devices.
+     -- Without this the dashboard falls back to polling every 4s.
+     alter publication supabase_realtime add table votes;
+     alter publication supabase_realtime add table sessions;
 -->
 <script>
   const SUPABASE_URL = 'https://sseqnlnuwauksmrrliyc.supabase.co';
@@ -448,7 +453,56 @@ function subscribeRealtime() {
         updateMatrix();
       }
     })
-    .subscribe();
+    .subscribe((status, err) => {
+      console.log('[Realtime]', status, err || '');
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        console.warn('[Realtime] not connected — relying on the 4s polling fallback');
+      }
+    });
+}
+
+// ═══════════════════════════════════════════════════════
+// POLLING FALLBACK — keeps the dashboard live even if Supabase
+// Realtime is disabled on the project's votes/sessions tables.
+// ═══════════════════════════════════════════════════════
+const POLL_MS = 4000;
+let pollTimer = null;
+
+function isUserEditing() {
+  const el = document.activeElement;
+  if (!el || !el.classList) return false;
+  return el.classList.contains('bonus-input')
+      || el.classList.contains('pts-inp')
+      || el.classList.contains('email-inp');
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    if (!dbClient || !currentUser) return;
+    if (isUserEditing()) return; // don't blow away in-progress typing
+    try {
+      await loadFromSupabase();
+      // Rebuild this team's voted state from the freshly loaded log
+      if (currentUser.team) {
+        myVotedTeams = {};
+        TEAMS.forEach(t => myVotedTeams[t.id] = null);
+        voteLog.forEach(v => {
+          if (v.from !== currentUser.team.name) return;
+          const target = TEAMS.find(t => t.name === v.to);
+          if (target) myVotedTeams[target.id] = { pts: v.pts, confirmed: true };
+        });
+      }
+      renderChart();
+      renderVoteCards();
+      updateMatrix();
+      checkChampion();
+    } catch(e) { /* swallow transient errors */ }
+  }, POLL_MS);
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
 async function dbLockTeam(teamId, email, name) {
@@ -713,6 +767,7 @@ async function finishLogin(user) {
   updateMatrix();
   checkChampion();
   saveSession(user);
+  startPolling();
 }
 
 async function logout() {
@@ -720,6 +775,7 @@ async function logout() {
     await dbUnlockTeam(currentUser.team.id);
   }
   clearSession();
+  stopPolling();
   currentUser = null;
   myVotedTeams = {};
   TEAMS.forEach(t => myVotedTeams[t.id] = null);
