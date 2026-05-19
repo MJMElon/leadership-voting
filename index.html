@@ -126,7 +126,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .g-lbl{position:absolute;left:-2.4rem;font-size:.58rem;color:var(--muted);transform:translateY(50%);font-family:'Orbitron',monospace;}
 
 /* OLD flex bar-slot removed — now uses absolute positioned bars via JS */
-.bar-val{font-family:'Orbitron',monospace;font-size:clamp(.46rem,1.1vw,.65rem);font-weight:700;text-align:center;min-height:.9em;transition:color .3s;}
+.bar-val{font-family:'Orbitron',monospace;font-size:clamp(.6rem,1.3vw,.82rem);font-weight:700;text-align:center;min-height:.9em;transition:color .3s;}
 .bar-lbl{font-family:'Orbitron',monospace;font-size:clamp(.68rem,1.4vw,.95rem);font-weight:700;text-align:center;padding-bottom:.15rem;transition:color .3s;line-height:1.35;}
 .bar-emoji{font-size:clamp(.9rem,1.8vw,1.25rem);display:block;margin-bottom:.08rem;}
 .rank-medal{font-size:1rem;line-height:1;}
@@ -207,7 +207,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 /* smooth bar slot transitions using CSS left positioning */
 #chart-bars{position:relative;}
 .bar-slot{position:absolute;bottom:0;top:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.3rem;transition:left .7s cubic-bezier(.4,0,.2,1),width .7s cubic-bezier(.4,0,.2,1);}
-.bar-fill-wrap{width:100%;flex:1;display:flex;align-items:flex-end;}
+.bar-fill-wrap{width:100%;display:flex;align-items:flex-end;transition:height .6s cubic-bezier(.22,1,.36,1);}
 .bar-fill{width:100%;border-radius:4px 4px 0 0;transition:height .6s cubic-bezier(.22,1,.36,1);}
 .bar-fill.champ-bar{animation:bglow 1.5s ease-in-out infinite;}
 @keyframes bglow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.4) drop-shadow(0 0 14px currentColor)}}
@@ -806,7 +806,7 @@ function renderChart(){
 
   ranked.forEach((t, rankIdx) => {
     const val    = votes[t.id] || 0;
-    const bH     = Math.max((val/cMax)*usableH, val>0?3:0);
+    const bH     = Math.max((val/cMax)*usableH, val>0?10:0);
     const isChamp= rankIdx===0 && val>0;
     const leftX  = rankIdx * (slotW + gap);
 
@@ -836,11 +836,12 @@ function renderChart(){
     slot.style.left  = leftX+'px';
     slot.style.width = slotW+'px';
 
-    // Update bar height
+    // Update bar height — also size the wrap so the value label sits right above the bar
     const fill = document.getElementById('bfill-'+t.id);
     if (fill) {
       fill.style.height = bH+'px';
       fill.className = 'bar-fill' + (isChamp?' champ-bar':'');
+      if (fill.parentElement) fill.parentElement.style.height = bH+'px';
     }
 
     // Update value label
