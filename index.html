@@ -463,6 +463,13 @@ async function proceedEmail() {
     }
   }
 
+  // All teams claimed — log in as viewer (read-only)
+  if (Object.keys(takenTeams).length >= TEAMS.length) {
+    partial.team = null;
+    showToast(`All teams taken — entering as viewer.`);
+    return finishLogin(partial);
+  }
+
   // New voter — show team picker
   openTeamModal(partial);
 }
@@ -501,21 +508,26 @@ async function finishLogin(user) {
   currentUser = user;
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
-  document.getElementById('u-avatar').textContent = user.avatar;
+  document.getElementById('u-avatar').textContent = user.team ? user.avatar : '👁';
   document.getElementById('u-name').textContent = user.name;
-  document.getElementById('u-team').textContent = user.team.emoji + ' ' + user.team.name;
+  document.getElementById('u-team').textContent = user.team
+    ? user.team.emoji + ' ' + user.team.name
+    : '👁️ Viewer';
 
-  // Pull the latest votes so we have a fresh picture for this team
+  // Pull the latest votes so we have a fresh picture
   if (dbClient) await loadFromSupabase();
 
-  // Restore previous votes from this team (each team only votes once)
+  // Restore previous votes from this team (each team only votes once).
+  // Viewers have no team — they can only watch.
   myVotedTeams = {};
   TEAMS.forEach(t => myVotedTeams[t.id] = null);
-  voteLog.forEach(v => {
-    if (v.from !== user.team.name) return;
-    const target = TEAMS.find(t => t.name === v.to);
-    if (target) myVotedTeams[target.id] = { pts: v.pts, confirmed: true };
-  });
+  if (user.team) {
+    voteLog.forEach(v => {
+      if (v.from !== user.team.name) return;
+      const target = TEAMS.find(t => t.name === v.to);
+      if (target) myVotedTeams[target.id] = { pts: v.pts, confirmed: true };
+    });
+  }
 
   renderChart();
   renderVoteCards();
@@ -543,6 +555,10 @@ async function logout() {
 // ═══════════════════════════════════════════════════════
 function renderVoteCards() {
   const grid = document.getElementById('vote-grid');
+  const section = grid.closest('.vote-section');
+  // Viewer mode — no team, hide the voting UI entirely
+  if (!currentUser?.team) { if (section) section.style.display = 'none'; return; }
+  if (section) section.style.display = '';
   grid.innerHTML = '';
 
   const sorted = [...TEAMS].sort((a, b) => {
