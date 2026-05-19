@@ -42,7 +42,7 @@
 :root{
   --bg:#0a0e1a;--surface:#111827;--surface2:#1e2d40;
   --accent:#f59e0b;--accent2:#ef4444;--gold:#ffd700;
-  --text:#e2e8f0;--muted:#64748b;
+  --text:#f1f5f9;--muted:#a3b2c7;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;}
@@ -62,8 +62,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .page-header{text-align:center;padding:2rem 1rem 1rem;}
 .trophy-icon{font-size:2.2rem;display:block;margin-bottom:.4rem;animation:floatT 3s ease-in-out infinite;}
 @keyframes floatT{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
-.page-header h1{font-family:'Orbitron',monospace;font-size:clamp(.85rem,2.4vw,1.7rem);font-weight:900;background:linear-gradient(135deg,var(--gold),var(--accent),#ff6b35);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:.04em;line-height:1.4;}
-.page-header p{color:var(--muted);font-size:.82rem;margin-top:.35rem;letter-spacing:.15em;text-transform:uppercase;}
+.page-header h1{font-family:'Orbitron',monospace;font-size:clamp(.85rem,2.4vw,1.7rem);font-weight:900;color:var(--gold);letter-spacing:.04em;line-height:1.4;text-shadow:0 0 18px rgba(255,215,0,.35);}
+.page-header p{color:#cbd5e1;font-size:.82rem;margin-top:.35rem;letter-spacing:.15em;text-transform:uppercase;}
 
 /* auth */
 #auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:75vh;gap:1.4rem;padding:2rem;}
@@ -126,7 +126,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .g-lbl{position:absolute;left:-2.4rem;font-size:.58rem;color:var(--muted);transform:translateY(50%);font-family:'Orbitron',monospace;}
 
 /* OLD flex bar-slot removed — now uses absolute positioned bars via JS */
-.bar-val{font-family:'Orbitron',monospace;font-size:clamp(.46rem,1.1vw,.65rem);font-weight:700;text-align:center;min-height:.9em;transition:color .3s;}
+.bar-val{font-family:'Orbitron',monospace;font-size:clamp(.6rem,1.3vw,.82rem);font-weight:700;text-align:center;min-height:.9em;transition:color .3s;}
 .bar-lbl{font-family:'Orbitron',monospace;font-size:clamp(.68rem,1.4vw,.95rem);font-weight:700;text-align:center;padding-bottom:.15rem;transition:color .3s;line-height:1.35;}
 .bar-emoji{font-size:clamp(.9rem,1.8vw,1.25rem);display:block;margin-bottom:.08rem;}
 .rank-medal{font-size:1rem;line-height:1;}
@@ -158,7 +158,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .kp-wrap{display:flex;flex-direction:column;gap:.48rem;}
 .pts-inp{width:100%;background:var(--surface2);border:1px solid #2d3748;border-radius:.5rem;padding:.48rem .7rem;color:var(--accent);font-family:'Orbitron',monospace;font-size:1.05rem;font-weight:700;outline:none;text-align:center;transition:border-color .2s,box-shadow .2s;}
 .pts-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.15);}
-.pts-inp::placeholder{color:#334155;font-size:.72rem;}
+.pts-inp::placeholder{color:#64748b;font-size:.72rem;}
 .pts-inp:disabled{opacity:.5;cursor:not-allowed;}
 .pts-inp.confirmed{border-color:#34d399;color:#34d399;}
 .kp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.28rem;}
@@ -201,13 +201,13 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .voter-team-badge{font-size:.62rem;padding:.06rem .35rem;border-radius:99px;border:1px solid;display:inline-block;margin-top:.15rem;}
 .tick-cell{font-size:1.1rem;line-height:1;}
 .tick-yes{color:#34d399;}
-.tick-no{color:#334155;font-size:.7rem;}
-.own-cell{color:#334155;font-size:.85rem;}
+.tick-no{color:#64748b;font-size:.7rem;}
+.own-cell{color:#64748b;font-size:.85rem;}
 
 /* smooth bar slot transitions using CSS left positioning */
 #chart-bars{position:relative;}
 .bar-slot{position:absolute;bottom:0;top:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.3rem;transition:left .7s cubic-bezier(.4,0,.2,1),width .7s cubic-bezier(.4,0,.2,1);}
-.bar-fill-wrap{width:100%;flex:1;display:flex;align-items:flex-end;}
+.bar-fill-wrap{width:100%;display:flex;align-items:flex-end;transition:height .6s cubic-bezier(.22,1,.36,1);}
 .bar-fill{width:100%;border-radius:4px 4px 0 0;transition:height .6s cubic-bezier(.22,1,.36,1);}
 .bar-fill.champ-bar{animation:bglow 1.5s ease-in-out infinite;}
 @keyframes bglow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.4) drop-shadow(0 0 14px currentColor)}}
@@ -215,12 +215,6 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 /* rocket */
 .rocket-fly{position:fixed;pointer-events:none;font-size:1.5rem;z-index:997;}
 .pts-pop{position:fixed;pointer-events:none;font-family:'Orbitron',monospace;font-weight:900;font-size:1rem;text-shadow:0 0 8px currentColor;z-index:996;}
-
-/* supabase notice */
-.db-notice{max-width:960px;margin:0 auto 1rem;background:#1a1f0a;border:1px solid #4a5530;border-radius:.7rem;padding:.7rem 1rem;font-size:.78rem;color:#a3b86c;display:flex;align-items:center;gap:.5rem;}
-.db-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;animation:blink 1.5s infinite;}
-.db-dot.off{background:#f87171;animation:none;}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 @media(max-width:600px){.chart-bars{height:220px;}.vote-grid{grid-template-columns:1fr;}}
 </style>
@@ -277,11 +271,6 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 
   <div class="page-header" style="padding:.5rem 1rem 1rem;">
     <h1>MORNING BRIEFING · LEADERSHIP TRAINING VOTING SYSTEM</h1>
-  </div>
-
-  <div class="db-notice" id="db-notice">
-    <div class="db-dot off" id="db-dot"></div>
-    <span id="db-status">Local mode — configure Supabase URL & KEY to enable live sync</span>
   </div>
 
   <div id="champ-banner">
@@ -358,18 +347,11 @@ async function initSupabase() {
   try {
     const mod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
     dbClient = mod.createClient(SUPABASE_URL, SUPABASE_KEY);
-    setDbStatus(true, 'Supabase connected — live sync active');
     await loadFromSupabase();
     subscribeRealtime();
   } catch(e) {
-    setDbStatus(false, 'Supabase error: ' + e.message);
     console.error('Supabase init failed:', e);
   }
-}
-
-function setDbStatus(ok, msg) {
-  document.getElementById('db-dot').className = 'db-dot' + (ok ? '' : ' off');
-  document.getElementById('db-status').textContent = msg;
 }
 
 async function loadFromSupabase() {
@@ -389,10 +371,16 @@ async function loadFromSupabase() {
   });
 }
 
+const ourVoteIds = new Set();
+
 function subscribeRealtime() {
   if (!dbClient) return;
   dbClient.channel('votes-rt').on('postgres_changes',{event:'INSERT',schema:'public',table:'votes'}, payload => {
     const v = payload.new;
+    if (ourVoteIds.has(v.id)) return; // we already added this locally
+    // Also dedupe by content in case realtime fires before our save resolves
+    const dupe = voteLog.some(l => l.email === v.voter_email && l.pts === v.points && TEAMS.find(t=>t.name===l.to)?.id === v.to_team_id);
+    if (dupe) { ourVoteIds.add(v.id); return; }
     votes[v.to_team_id] = (votes[v.to_team_id]||0) + v.points;
     const tName = TEAMS.find(t=>t.id===v.to_team_id)?.name||'';
     voteLog.unshift({voter:v.voter_name, email:v.voter_email, from:v.from_team, to:tName, pts:v.points, time:new Date(v.created_at).toLocaleTimeString()});
@@ -414,15 +402,16 @@ async function dbLockTeam(teamId, email, name) {
 }
 
 async function dbSaveVote(toTeamId, pts) {
-  if (!dbClient) return true;
-  const {error} = await dbClient.from('votes').insert({
+  if (!dbClient) return {ok:true, id:null};
+  const {data, error} = await dbClient.from('votes').insert({
     voter_email: currentUser.email,
     voter_name:  currentUser.name,
     from_team:   currentUser.team.name,
     to_team_id:  toTeamId,
     points:      pts
-  });
-  return !error;
+  }).select().single();
+  if (error) return {ok:false, id:null};
+  return {ok:true, id:data?.id||null};
 }
 
 async function dbUnlockTeam(teamId) {
@@ -434,7 +423,7 @@ async function dbUnlockTeam(teamId) {
 // ═══════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════
-function proceedEmail() {
+async function proceedEmail() {
   const inp = document.getElementById('email-inp');
   const email = inp.value.trim().toLowerCase();
   if (!email || !email.includes('@')) {
@@ -443,15 +432,39 @@ function proceedEmail() {
     setTimeout(() => inp.style.borderColor = '', 1600);
     return;
   }
-  // Check if this email already has a session
-  const existingTeamId = Object.keys(takenTeams).find(k => takenTeams[k] === email);
-  if (existingTeamId) {
-    showToast('⚠️ This email is already logged in. Please use a different email.', true);
-    return;
-  }
+
+  // Refresh sessions/votes so we know if this email is returning
+  if (dbClient) await loadFromSupabase();
+
   const raw  = email.split('@')[0].replace(/[._+]/g,' ');
   const name = raw.replace(/\b\w/g, c => c.toUpperCase());
-  openTeamModal({ name, email, avatar: name[0].toUpperCase() });
+  const partial = { name, email, avatar: name[0].toUpperCase() };
+
+  // Returning user — already has an active session lock
+  const activeTeamId = Object.keys(takenTeams).find(k => takenTeams[k] === email);
+  if (activeTeamId) {
+    const team = TEAMS.find(t => t.id === parseInt(activeTeamId));
+    if (team) {
+      partial.team = team;
+      showToast(`Welcome back, ${name}!`);
+      return finishLogin(partial);
+    }
+  }
+
+  // Returning user — voted before, re-enter their team without picking again
+  const prevVote = voteLog.find(v => v.email === email);
+  if (prevVote) {
+    const team = TEAMS.find(t => t.name === prevVote.from);
+    if (team) {
+      if (!takenTeams[team.id]) await dbLockTeam(team.id, email, name);
+      partial.team = team;
+      showToast(`Welcome back, ${name}! Viewing your team's votes.`);
+      return finishLogin(partial);
+    }
+  }
+
+  // New voter — show team picker
+  openTeamModal(partial);
 }
 
 function openTeamModal(partial) {
@@ -484,16 +497,30 @@ function openTeamModal(partial) {
   document.getElementById('team-modal').classList.add('open');
 }
 
-function finishLogin(user) {
+async function finishLogin(user) {
   currentUser = user;
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
   document.getElementById('u-avatar').textContent = user.avatar;
   document.getElementById('u-name').textContent = user.name;
   document.getElementById('u-team').textContent = user.team.emoji + ' ' + user.team.name;
+
+  // Pull the latest votes so we have a fresh picture for this team
+  if (dbClient) await loadFromSupabase();
+
+  // Restore previous votes from this team (each team only votes once)
+  myVotedTeams = {};
+  TEAMS.forEach(t => myVotedTeams[t.id] = null);
+  voteLog.forEach(v => {
+    if (v.from !== user.team.name) return;
+    const target = TEAMS.find(t => t.name === v.to);
+    if (target) myVotedTeams[target.id] = { pts: v.pts, confirmed: true };
+  });
+
   renderChart();
   renderVoteCards();
   updateMatrix();
+  checkChampion();
 }
 
 async function logout() {
@@ -681,7 +708,7 @@ async function confirmPoints(tid) {
   // If re-editing an already-confirmed vote, subtract the old amount first
   const wasConfirmed = myVotedTeams[tid]?.confirmed;
   const oldPts = myVotedTeams[tid]?.pts || 0;
-  if (wasConfirmed && oldPts > 0 && !dbClient) {
+  if (wasConfirmed && oldPts > 0) {
     votes[tid] = Math.max(0, (votes[tid]||0) - oldPts);
   }
 
@@ -694,22 +721,21 @@ async function confirmPoints(tid) {
 
 async function launchVote(tid, pts) {
   // Persist to DB
-  const ok = await dbSaveVote(tid, pts);
+  const {ok, id} = await dbSaveVote(tid, pts);
   if (!ok) {
     showToast('⚠️ Failed to save vote. Try again.', true);
-    editVote(tid);
+    renderVoteCards();
     return;
   }
+  if (id != null) ourVoteIds.add(id);
 
   // Mark confirmed in local state
   myVotedTeams[tid] = { pts, confirmed: true };
 
-  // Local totals (if not using Supabase realtime)
-  if (!dbClient) {
-    votes[tid] = (votes[tid]||0) + pts;
-    const tName = TEAMS.find(t=>t.id===tid)?.name||'';
-    voteLog.unshift({voter:currentUser?.name||'–', email:currentUser?.email||'–', from:currentUser?.team?.name||'–', to:tName, pts, time:new Date().toLocaleTimeString()});
-  }
+  // Update local totals immediately (don't wait for realtime — it may be off or slow)
+  votes[tid] = (votes[tid]||0) + pts;
+  const tName = TEAMS.find(t=>t.id===tid)?.name||'';
+  voteLog.unshift({voter:currentUser?.name||'–', email:currentUser?.email||'–', from:currentUser?.team?.name||'–', to:tName, pts, time:new Date().toLocaleTimeString()});
 
   // Find positions for rocket animation
   const cardEl = document.getElementById('vcard-'+tid);
@@ -719,7 +745,6 @@ async function launchVote(tid, pts) {
   if (barEl) {const r=barEl.getBoundingClientRect(); ex=r.left+r.width/2;ey=r.top+r.height*0.2;}
 
   const tColor = TEAMS.find(t=>t.id===tid)?.color||'#f59e0b';
-  const tName  = TEAMS.find(t=>t.id===tid)?.name||'';
 
   animRocket(sx,sy,ex,ey,pts,tColor, ()=>{
     renderChart();
@@ -805,7 +830,7 @@ function renderChart(){
 
   ranked.forEach((t, rankIdx) => {
     const val    = votes[t.id] || 0;
-    const bH     = Math.max((val/cMax)*usableH, val>0?3:0);
+    const bH     = Math.max((val/cMax)*usableH, val>0?10:0);
     const isChamp= rankIdx===0 && val>0;
     const leftX  = rankIdx * (slotW + gap);
 
@@ -835,11 +860,12 @@ function renderChart(){
     slot.style.left  = leftX+'px';
     slot.style.width = slotW+'px';
 
-    // Update bar height
+    // Update bar height — also size the wrap so the value label sits right above the bar
     const fill = document.getElementById('bfill-'+t.id);
     if (fill) {
       fill.style.height = bH+'px';
       fill.className = 'bar-fill' + (isChamp?' champ-bar':'');
+      if (fill.parentElement) fill.parentElement.style.height = bH+'px';
     }
 
     // Update value label
