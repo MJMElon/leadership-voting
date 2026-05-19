@@ -486,30 +486,35 @@ const POLL_MS = 4000;
 let pollTimer = null;
 
 function isUserEditing() {
-  // Grace period after any vote/bonus typing or keypad tap, so brief
-  // pauses while the user is still keying in a value don't trigger a
-  // re-render that wipes the input.
-  if (Date.now() - lastInputAt < 12000) return true;
+  // Generous grace period after any vote/bonus typing or keypad tap, so
+  // brief pauses while keying in a value don't trigger a re-render that
+  // wipes the input.
+  if (Date.now() - lastInputAt < 18000) return true;
   const el = document.activeElement;
   if (!el || !el.classList) return false;
   return el.classList.contains('bonus-input')
       || el.classList.contains('pts-inp')
       || el.classList.contains('email-inp')
-      || el.classList.contains('kp-btn');
+      || el.classList.contains('kp-btn')
+      || !!el.closest?.('.kp-wrap, .voted-panel, .bonus-cell');
 }
 
 let lastInputAt = 0;
 function bumpInputTime(){ lastInputAt = Date.now(); }
-// Catch every keypad tap / value change anywhere in the doc, including
-// elements that don't exist yet (the keypad gets re-rendered).
-addEventListener('input', e => {
-  const t = e.target;
-  if (t?.classList?.contains('pts-inp') || t?.classList?.contains('bonus-input')) bumpInputTime();
-}, true);
-addEventListener('pointerdown', e => {
-  const t = e.target;
-  if (t?.classList?.contains('kp-btn') || t?.classList?.contains('pts-inp') || t?.classList?.contains('bonus-input')) bumpInputTime();
-}, true);
+// Catch every interaction with vote/bonus inputs or keypad buttons.
+// Cast a wide net — some mobile browsers don't fire pointerdown reliably
+// on synthetic taps, and the keypad gets re-rendered, so we use capture
+// listeners that match by class/closest instead of by element reference.
+function isVoteUiTarget(t) {
+  if (!t || !t.classList) return false;
+  return t.classList.contains('pts-inp')
+      || t.classList.contains('bonus-input')
+      || t.classList.contains('kp-btn')
+      || (t.closest && !!t.closest('.kp-wrap, .voted-panel, .bonus-cell'));
+}
+['input','keydown','pointerdown','touchstart','click','focusin','change'].forEach(ev => {
+  addEventListener(ev, e => { if (isVoteUiTarget(e.target)) bumpInputTime(); }, true);
+});
 
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
@@ -844,13 +849,15 @@ function renderVoteCards() {
   if (!currentUser?.team) { if (section) section.style.display = 'none'; return; }
   if (section) section.style.display = '';
 
-  // Preserve any in-progress typed value so a re-render (e.g. from a
-  // remote vote arriving while you're keying in your own) doesn't wipe
-  // what you've typed.
+  // Preserve any in-progress typed value AND focus so a re-render (e.g.
+  // from a remote vote arriving while you're keying in your own) doesn't
+  // wipe what you've typed or close the mobile keyboard.
   const drafts = {};
+  let focusedTid = null;
   TEAMS.forEach(t => {
     const inp = document.getElementById('pinp-' + t.id);
     if (inp && inp.value && !myVotedTeams[t.id]?.confirmed) drafts[t.id] = inp.value;
+    if (inp && document.activeElement === inp) focusedTid = t.id;
   });
 
   grid.innerHTML = '';
@@ -895,6 +902,12 @@ function renderVoteCards() {
   for (const tid in drafts) {
     const inp = document.getElementById('pinp-' + tid);
     if (inp) inp.value = drafts[tid];
+  }
+  // Refocus the input that was being typed into so the mobile keyboard
+  // doesn't close after a remote-driven re-render.
+  if (focusedTid != null) {
+    const inp = document.getElementById('pinp-' + focusedTid);
+    if (inp) inp.focus();
   }
 }
 
