@@ -525,11 +525,17 @@ async function dbLockTeam(teamId, email, name) {
   if (owner && owner !== email) return false;
   if (!dbClient) { takenTeams[teamId] = email; return true; }
   // Race-condition guard against another session claiming concurrently
-  const {data} = await dbClient.from('sessions').select('email').eq('team_id', teamId).single();
+  const {data, error: selErr} = await dbClient.from('sessions').select('email').eq('team_id', teamId).maybeSingle();
+  if (selErr) console.warn('[dbLockTeam] select error', selErr);
   if (data && data.email !== email) return false;
   if (!data) {
     const {error} = await dbClient.from('sessions').insert({team_id:teamId, email, name});
-    if (error) return false;
+    if (error) {
+      console.error('[dbLockTeam] insert failed for', email, 'team', teamId, error);
+      showToast(`⚠️ DB write failed: ${error.message}`, true);
+      return false;
+    }
+    console.log('[dbLockTeam] inserted session', email, '→ team', teamId);
   }
   takenTeams[teamId] = email;
   return true;
@@ -544,7 +550,11 @@ async function dbSaveVote(toTeamId, pts) {
     to_team_id:  toTeamId,
     points:      pts
   }).select().single();
-  if (error) return {ok:false, id:null};
+  if (error) {
+    console.error('[dbSaveVote] insert failed', error);
+    showToast(`⚠️ DB write failed: ${error.message}`, true);
+    return {ok:false, id:null};
+  }
   return {ok:true, id:data?.id||null};
 }
 
@@ -640,17 +650,22 @@ async function saveBonus(teamId) {
   // Replace the bonus row for this team in the DB. Always insert (even pts=0)
   // so the INSERT event propagates the new value to every other browser.
   if (dbClient) {
-    await dbClient.from('votes')
+    const {error: delErr} = await dbClient.from('votes')
       .delete()
       .eq('from_team', BONUS_MARKER)
       .eq('to_team_id', teamId);
-    const {data} = await dbClient.from('votes').insert({
+    if (delErr) console.warn('[saveBonus] delete failed', delErr);
+    const {data, error: insErr} = await dbClient.from('votes').insert({
       voter_email: BONUS_EMAIL,
       voter_name:  'Bonus',
       from_team:   BONUS_MARKER,
       to_team_id:  teamId,
       points:      pts
     }).select().single();
+    if (insErr) {
+      console.error('[saveBonus] insert failed', insErr);
+      showToast(`⚠️ Bonus save failed: ${insErr.message}`, true);
+    }
     if (data?.id) ourVoteIds.add(data.id);
   }
   const tName = TEAMS.find(t=>t.id===teamId)?.name || '';
@@ -785,9 +800,9 @@ async function finishLogin(user) {
 }
 
 async function logout() {
-  if (currentUser?.team) {
-    await dbUnlockTeam(currentUser.team.id);
-  }
+  // Keep the session row in the DB so team ownership stays bound to this
+  // email (a logged-out user can come back, and other emails can't claim
+  // the slot). Only the local browser state is cleared.
   clearSession();
   stopPolling();
   currentUser = null;
