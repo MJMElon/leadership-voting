@@ -486,12 +486,30 @@ const POLL_MS = 4000;
 let pollTimer = null;
 
 function isUserEditing() {
+  // Grace period after any vote/bonus typing or keypad tap, so brief
+  // pauses while the user is still keying in a value don't trigger a
+  // re-render that wipes the input.
+  if (Date.now() - lastInputAt < 12000) return true;
   const el = document.activeElement;
   if (!el || !el.classList) return false;
   return el.classList.contains('bonus-input')
       || el.classList.contains('pts-inp')
-      || el.classList.contains('email-inp');
+      || el.classList.contains('email-inp')
+      || el.classList.contains('kp-btn');
 }
+
+let lastInputAt = 0;
+function bumpInputTime(){ lastInputAt = Date.now(); }
+// Catch every keypad tap / value change anywhere in the doc, including
+// elements that don't exist yet (the keypad gets re-rendered).
+addEventListener('input', e => {
+  const t = e.target;
+  if (t?.classList?.contains('pts-inp') || t?.classList?.contains('bonus-input')) bumpInputTime();
+}, true);
+addEventListener('pointerdown', e => {
+  const t = e.target;
+  if (t?.classList?.contains('kp-btn') || t?.classList?.contains('pts-inp') || t?.classList?.contains('bonus-input')) bumpInputTime();
+}, true);
 
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
@@ -825,6 +843,16 @@ function renderVoteCards() {
   // Viewer mode — no team, hide the voting UI entirely
   if (!currentUser?.team) { if (section) section.style.display = 'none'; return; }
   if (section) section.style.display = '';
+
+  // Preserve any in-progress typed value so a re-render (e.g. from a
+  // remote vote arriving while you're keying in your own) doesn't wipe
+  // what you've typed.
+  const drafts = {};
+  TEAMS.forEach(t => {
+    const inp = document.getElementById('pinp-' + t.id);
+    if (inp && inp.value && !myVotedTeams[t.id]?.confirmed) drafts[t.id] = inp.value;
+  });
+
   grid.innerHTML = '';
 
   const sorted = [...TEAMS].sort((a, b) => {
@@ -862,6 +890,12 @@ function renderVoteCards() {
     grid.appendChild(card);
     if (!isOwn) attachKeypadEvents(t);
   });
+
+  // Restore any preserved draft input values after the DOM rebuild
+  for (const tid in drafts) {
+    const inp = document.getElementById('pinp-' + tid);
+    if (inp) inp.value = drafts[tid];
+  }
 }
 
 function buildKeypadHTML(t, myEntry) {
@@ -986,6 +1020,10 @@ async function confirmPoints(tid) {
   const pts  = parseInt(inp?.value)||0;
   if (pts<=0)      { showToast('⚠️ Enter points > 0 first', true); return; }
   if (pts>MAX_PTS) { showToast(`⚠️ Max ${MAX_PTS.toLocaleString()} pts`, true); return; }
+
+  // User just confirmed — drop the editing grace period so the chart
+  // updates from realtime/polling right away.
+  lastInputAt = 0;
 
   // If re-editing an already-confirmed vote, subtract the old amount first
   const wasConfirmed = myVotedTeams[tid]?.confirmed;
@@ -1309,6 +1347,14 @@ function updateMatrix() {
   document.getElementById('matrix-sub').textContent =
     voterTeams.length + ' team(s) have voted';
 
+  // Preserve any bonus input the user is currently typing in so a
+  // re-render doesn't wipe it.
+  const focusedBonus = {};
+  TEAMS.forEach(t => {
+    const inp = document.getElementById('bonus-' + t.id);
+    if (inp && document.activeElement === inp) focusedBonus[t.id] = inp.value;
+  });
+
   // Bonus row — editable by any logged-in user, adds to the team's chart total
   const bonusRow = `<tr class="bonus-row">
     <td class="voter-cell">
@@ -1352,6 +1398,12 @@ function updateMatrix() {
       ${cells}
     </tr>`;
   }).join('');
+
+  // Restore bonus drafts and refocus so the keyboard stays open on mobile
+  for (const tid in focusedBonus) {
+    const inp = document.getElementById('bonus-' + tid);
+    if (inp) { inp.value = focusedBonus[tid]; inp.focus(); }
+  }
 }
 
 // ═══════════════════════════════════════════════════════
