@@ -423,7 +423,7 @@ async function dbUnlockTeam(teamId) {
 // ═══════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════
-function proceedEmail() {
+async function proceedEmail() {
   const inp = document.getElementById('email-inp');
   const email = inp.value.trim().toLowerCase();
   if (!email || !email.includes('@')) {
@@ -432,15 +432,39 @@ function proceedEmail() {
     setTimeout(() => inp.style.borderColor = '', 1600);
     return;
   }
-  // Check if this email already has a session
-  const existingTeamId = Object.keys(takenTeams).find(k => takenTeams[k] === email);
-  if (existingTeamId) {
-    showToast('⚠️ This email is already logged in. Please use a different email.', true);
-    return;
-  }
+
+  // Refresh sessions/votes so we know if this email is returning
+  if (dbClient) await loadFromSupabase();
+
   const raw  = email.split('@')[0].replace(/[._+]/g,' ');
   const name = raw.replace(/\b\w/g, c => c.toUpperCase());
-  openTeamModal({ name, email, avatar: name[0].toUpperCase() });
+  const partial = { name, email, avatar: name[0].toUpperCase() };
+
+  // Returning user — already has an active session lock
+  const activeTeamId = Object.keys(takenTeams).find(k => takenTeams[k] === email);
+  if (activeTeamId) {
+    const team = TEAMS.find(t => t.id === parseInt(activeTeamId));
+    if (team) {
+      partial.team = team;
+      showToast(`Welcome back, ${name}!`);
+      return finishLogin(partial);
+    }
+  }
+
+  // Returning user — voted before, re-enter their team without picking again
+  const prevVote = voteLog.find(v => v.email === email);
+  if (prevVote) {
+    const team = TEAMS.find(t => t.name === prevVote.from);
+    if (team) {
+      if (!takenTeams[team.id]) await dbLockTeam(team.id, email, name);
+      partial.team = team;
+      showToast(`Welcome back, ${name}! Viewing your team's votes.`);
+      return finishLogin(partial);
+    }
+  }
+
+  // New voter — show team picker
+  openTeamModal(partial);
 }
 
 function openTeamModal(partial) {
