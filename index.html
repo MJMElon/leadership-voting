@@ -46,7 +46,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,#1a1040 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,#0c1a30 0%,transparent 40%);pointer-events:none;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,#0c0820 0%,transparent 45%),radial-gradient(ellipse at 80% 20%,#080f1f 0%,transparent 35%);pointer-events:none;opacity:.45;}
 
 /* layers */
 #fw-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999;}
@@ -89,6 +89,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .team-pick-btn:not(:disabled):hover{background:var(--accent);color:#000;border-color:var(--accent);}
 .team-pick-btn:disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through;}
 .taken-lbl{font-size:.6rem;color:var(--accent2);display:block;margin-top:.15rem;}
+.btn-viewer{width:100%;background:var(--surface2);border:1px solid var(--accent);color:var(--accent);border-radius:.55rem;padding:.55rem;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:.88rem;margin-bottom:.5rem;transition:all .2s;}
+.btn-viewer:hover{background:var(--accent);color:#000;}
 .btn-cancel{width:100%;background:transparent;border:1px solid #2d3748;color:var(--muted);border-radius:.45rem;padding:.42rem;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:.82rem;transition:all .2s;}
 .btn-cancel:hover{border-color:var(--accent2);color:var(--accent2);}
 
@@ -113,17 +115,15 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .crown{font-size:2rem;display:inline-block;animation:floatT 2s ease-in-out infinite;}
 
 /* chart */
-.chart-wrap{max-width:960px;margin:0 auto 1.8rem;background:var(--surface);border:1px solid #2d3748;border-radius:1.2rem;padding:1.3rem;}
-.chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;flex-wrap:wrap;gap:.4rem;}
+.chart-wrap{max-width:960px;margin:0 auto 1.8rem;background:var(--surface);border:1px solid #2d3748;border-radius:1.2rem;padding:1.3rem;position:relative;z-index:991;}
+.chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;flex-wrap:wrap;gap:.4rem;position:relative;z-index:2;}
 .chart-head h2{font-family:'Orbitron',monospace;font-size:.85rem;color:var(--accent);letter-spacing:.05em;}
-.total-badge{background:var(--surface2);border:1px solid #2d3748;padding:.22rem .65rem;border-radius:99px;font-size:.78rem;color:var(--muted);}
-.total-badge span{color:var(--text);font-weight:700;}
 .rank-hint{font-size:.72rem;color:var(--muted);font-style:italic;}
 
-.chart-bars{height:300px;padding:0 .5rem 0 2.8rem;position:relative;}
-.chart-grid{position:absolute;left:2.8rem;right:.5rem;top:0;bottom:0;pointer-events:none;}
-.g-line{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.05);}
-.g-lbl{position:absolute;left:-2.4rem;font-size:.58rem;color:var(--muted);transform:translateY(50%);font-family:'Orbitron',monospace;}
+.chart-bars{height:320px;padding:1.2rem .6rem 0 3.6rem;position:relative;}
+.chart-grid{position:absolute;left:3.6rem;right:.6rem;top:1.2rem;bottom:0;pointer-events:none;}
+.g-line{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.06);}
+.g-lbl{position:absolute;left:-3.1rem;font-size:.62rem;color:var(--muted);transform:translateY(50%);font-family:'Orbitron',monospace;}
 
 /* OLD flex bar-slot removed — now uses absolute positioned bars via JS */
 .bar-val{font-family:'Orbitron',monospace;font-size:clamp(.6rem,1.3vw,.82rem);font-weight:700;text-align:center;min-height:.9em;transition:color .3s;}
@@ -250,8 +250,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div class="modal-ov" id="team-modal">
   <div class="modal-box">
     <h3>🏅 SELECT YOUR TEAM</h3>
-    <p>You can only vote for other teams. Each team slot can only be taken once.</p>
+    <p>You can only vote for other teams. Each team slot can only be taken once. Pick "Viewer" if you just want to watch.</p>
     <div class="team-grid" id="team-grid"></div>
+    <button class="btn-viewer" id="btn-viewer" onclick="enterAsViewer()">👁️ Enter as Viewer (no team)</button>
     <button class="btn-cancel" onclick="document.getElementById('team-modal').classList.remove('open')">Cancel</button>
   </div>
 </div>
@@ -282,10 +283,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   <div class="chart-wrap">
     <div class="chart-head">
       <h2>📊 LIVE STANDINGS</h2>
-      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
-        <span class="rank-hint">🔄 Bars sort by rank — leader always leftmost</span>
-        <div class="total-badge">Total: <span id="total-pts">0</span> pts</div>
-      </div>
+      <span class="rank-hint">🔄 Bars sort by rank — leader always leftmost</span>
     </div>
     <div class="chart-bars" id="chart-bars">
       <div class="chart-grid" id="chart-grid"></div>
@@ -463,15 +461,17 @@ async function proceedEmail() {
     }
   }
 
-  // All teams claimed — log in as viewer (read-only)
-  if (Object.keys(takenTeams).length >= TEAMS.length) {
-    partial.team = null;
-    showToast(`All teams taken — entering as viewer.`);
-    return finishLogin(partial);
-  }
-
-  // New voter — show team picker
+  // New voter — show team picker (with Viewer option always available)
   openTeamModal(partial);
+}
+
+async function enterAsViewer() {
+  const partial = window._pending;
+  if (!partial) return;
+  partial.team = null;
+  document.getElementById('team-modal').classList.remove('open');
+  showToast(`Entering as viewer.`);
+  await finishLogin(partial);
 }
 
 function openTeamModal(partial) {
@@ -826,8 +826,7 @@ function renderChart(){
   const leftPad   = 0; // already handled by container padding
   const gap       = 8;
   const slotW     = Math.floor((cW - gap*(n-1)) / n);
-  const usableH   = cH - 40; // reserve space for labels below
-
+  const usableH   = cH - 70; // reserve room for medal, value label, and team label
   const maxV = Math.max(...TEAMS.map(t=>votes[t.id]||0), 1);
   const cMax = maxV * 1.15;
 
@@ -893,9 +892,6 @@ function renderChart(){
     if (medalEl) medalEl.textContent = val>0 ? medals[rankIdx] : '';
   });
 
-  const total = TEAMS.reduce((s,t)=>s+(votes[t.id]||0),0);
-  document.getElementById('total-pts').textContent = total.toLocaleString();
-
   if (ranked[0] && votes[ranked[0].id]>0) startSpotlight(ranked[0]);
   else stopSpotlight();
 }
@@ -922,51 +918,15 @@ function startSpotlight(leaderTeam){
     const bx = r.left + r.width/2;
     const by = r.top;
 
-    // Sweeping multi-beam spotlight from top
-    spAngle += 0.012;
-    const beams = 7;
-    for(let i=0;i<beams;i++){
-      const spread = 0.18;
-      const base = spAngle + (i/beams)*Math.PI*2;
-      const beamA = base % (Math.PI*2);
-      // Only draw beams pointing roughly downward toward bar
-      const tx = bx + Math.sin(beamA)*Math.max(spC.height, spC.width)*1.5;
-      const ty = by + Math.cos(beamA)*Math.max(spC.height, spC.width)*1.5;
-
-      const grad = spX.createConicalGradient
-        ? null  // fallback below
-        : null;
-
-      // Use radial gradient approximation for each beam
-      const angle1 = beamA - spread;
-      const angle2 = beamA + spread;
-      const len = Math.max(spC.width, spC.height) * 1.2;
-
-      spX.save();
-      spX.globalAlpha = 0.07 + Math.sin(spAngle*3+i)*0.02;
-      spX.beginPath();
-      spX.moveTo(bx, by);
-      spX.lineTo(bx + Math.cos(angle1)*len, by + Math.sin(angle1)*len);
-      spX.lineTo(bx + Math.cos(angle2)*len, by + Math.sin(angle2)*len);
-      spX.closePath();
-
-      const grd = spX.createLinearGradient(bx,by, bx+Math.cos(beamA)*len, by+Math.sin(beamA)*len);
-      grd.addColorStop(0, color+'cc');
-      grd.addColorStop(0.5, color+'44');
-      grd.addColorStop(1, color+'00');
-      spX.fillStyle = grd;
-      spX.fill();
-      spX.restore();
-    }
-
-    // Bright halo at bar top
-    const haloR = 50 + Math.sin(spAngle*4)*10;
+    spAngle += 0.04;
+    // Soft pulsing halo at the bar top — no beams that obscure text above
+    const haloR = 45 + Math.sin(spAngle)*8;
     const halo = spX.createRadialGradient(bx,by,0,bx,by,haloR);
     halo.addColorStop(0,  color+'55');
-    halo.addColorStop(0.4,color+'22');
+    halo.addColorStop(0.5,color+'22');
     halo.addColorStop(1,  color+'00');
     spX.save();
-    spX.globalAlpha=0.8;
+    spX.globalAlpha = 0.7;
     spX.beginPath(); spX.arc(bx,by,haloR,0,Math.PI*2); spX.fillStyle=halo; spX.fill();
     spX.restore();
 
@@ -1026,9 +986,13 @@ function updateMatrix() {
     voterTeams.length + ' team(s) have voted';
 
   tbody.innerHTML = TEAMS.map(t => {
-    const email = Object.keys(takenTeams).length
-      ? (Object.entries(takenTeams).find(([k])=>parseInt(k)===t.id)?.[1] || '—')
-      : '—';
+    // Email is whoever currently holds the slot, or whoever previously voted from this team
+    let email = takenTeams[t.id];
+    if (!email) {
+      const fromVote = voteLog.find(v => v.from === t.name);
+      if (fromVote) email = fromVote.email;
+    }
+    email = email || '—';
     const voted = votesByTeam[t.name] || {};
     const cells = TEAMS.map(target => {
       if (target.id === t.id) {
