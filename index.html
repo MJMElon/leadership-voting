@@ -437,8 +437,16 @@ function subscribeRealtime() {
       if (currentUser) { renderChart(); renderVoteCards(); updateMatrix(); checkChampion(); }
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'sessions'}, payload => {
-      takenTeams[payload.new.team_id] = payload.new.email;
-      if (currentUser) renderVoteCards();
+      const newEmail = payload.new.email;
+      takenTeams[payload.new.team_id] = newEmail;
+      if (currentUser) {
+        if (newEmail !== currentUser.email) {
+          const t = TEAMS.find(x => x.id === payload.new.team_id);
+          showToast(`🎉 ${newEmail} claimed ${t?.name || 'a team'}`);
+        }
+        renderVoteCards();
+        updateMatrix();
+      }
     })
     .subscribe();
 }
@@ -476,6 +484,72 @@ async function dbUnlockTeam(teamId) {
   if (!dbClient) { delete takenTeams[teamId]; return; }
   await dbClient.from('sessions').delete().eq('team_id', teamId);
   delete takenTeams[teamId];
+}
+
+// ═══════════════════════════════════════════════════════
+// SESSION PERSISTENCE — survive a page refresh
+// ═══════════════════════════════════════════════════════
+const STORAGE_KEY = 'lv_session_v1';
+
+function saveSession(user) {
+  if (!user) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      email:  user.email,
+      name:   user.name,
+      teamId: user.team?.id ?? null
+    }));
+  } catch(e) { /* localStorage may be disabled */ }
+}
+
+function clearSession() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+}
+
+function getSavedSession() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return (data && data.email) ? data : null;
+  } catch(e) { return null; }
+}
+
+async function tryRestoreSession() {
+  const saved = getSavedSession();
+  if (!saved) return false;
+  if (dbClient) await loadFromSupabase();
+
+  const name = saved.name || saved.email.split('@')[0].replace(/[._+]/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+  const partial = { name, email: saved.email, avatar: name[0].toUpperCase() };
+
+  // Viewer mode
+  if (saved.teamId == null) {
+    partial.team = null;
+    await finishLogin(partial);
+    return true;
+  }
+
+  const team = TEAMS.find(t => t.id === saved.teamId);
+  if (!team) { clearSession(); return false; }
+
+  // If another email has since claimed this team, abandon the saved session
+  const owner = getTeamOwnerEmail(team.id);
+  if (owner && owner !== saved.email) {
+    clearSession();
+    showToast('Saved session no longer valid — please log in again.', true);
+    return false;
+  }
+
+  // Re-claim the slot if it isn't currently locked (e.g. browser was just closed)
+  if (!takenTeams[team.id]) {
+    const ok = await dbLockTeam(team.id, saved.email, name);
+    if (!ok) { clearSession(); return false; }
+  }
+
+  partial.team = team;
+  await finishLogin(partial);
+  return true;
 }
 
 async function saveBonus(teamId) {
@@ -595,6 +669,7 @@ function openTeamModal(partial) {
       }
       partial.team = t;
       document.getElementById('team-modal').classList.remove('open');
+      showToast(`🎉 ${partial.email} claimed ${t.name}`);
       finishLogin(partial);
     };
     grid.appendChild(btn);
@@ -615,6 +690,12 @@ async function finishLogin(user) {
   // Pull the latest votes so we have a fresh picture
   if (dbClient) await loadFromSupabase();
 
+  // Make sure our own claim is reflected even if the DB select hasn't
+  // observed the just-inserted session row yet.
+  if (user.team) {
+    takenTeams[user.team.id] = user.email;
+  }
+
   // Restore previous votes from this team (each team only votes once).
   // Viewers have no team — they can only watch.
   myVotedTeams = {};
@@ -631,12 +712,14 @@ async function finishLogin(user) {
   renderVoteCards();
   updateMatrix();
   checkChampion();
+  saveSession(user);
 }
 
 async function logout() {
   if (currentUser?.team) {
     await dbUnlockTeam(currentUser.team.id);
   }
+  clearSession();
   currentUser = null;
   myVotedTeams = {};
   TEAMS.forEach(t => myVotedTeams[t.id] = null);
@@ -1228,7 +1311,10 @@ function stopFW(){
 // ═══════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════
-initSupabase();
+(async () => {
+  await initSupabase();
+  await tryRestoreSession();
+})();
 </script>
 </body>
 </html>
