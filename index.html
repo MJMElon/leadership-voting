@@ -490,6 +490,11 @@ function isUserEditing() {
   // brief pauses while keying in a value don't trigger a re-render that
   // wipes the input.
   if (Date.now() - lastInputAt < 18000) return true;
+  // If any vote keypad still has an un-confirmed typed value, treat as editing.
+  for (const t of TEAMS) {
+    if (myVotedTeams[t.id]?.confirmed) continue;
+    if (voteDrafts[t.id]) return true;
+  }
   const el = document.activeElement;
   if (!el || !el.classList) return false;
   return el.classList.contains('bonus-input')
@@ -501,10 +506,12 @@ function isUserEditing() {
 
 let lastInputAt = 0;
 function bumpInputTime(){ lastInputAt = Date.now(); }
+// Persistent draft store — survives every DOM rebuild, even when the
+// browser quietly drops focus or clears the input value during a remote
+// event. Keyed by team id.
+const voteDrafts = {};
+const bonusDrafts = {};
 // Catch every interaction with vote/bonus inputs or keypad buttons.
-// Cast a wide net — some mobile browsers don't fire pointerdown reliably
-// on synthetic taps, and the keypad gets re-rendered, so we use capture
-// listeners that match by class/closest instead of by element reference.
 function isVoteUiTarget(t) {
   if (!t || !t.classList) return false;
   return t.classList.contains('pts-inp')
@@ -515,6 +522,19 @@ function isVoteUiTarget(t) {
 ['input','keydown','pointerdown','touchstart','click','focusin','change'].forEach(ev => {
   addEventListener(ev, e => { if (isVoteUiTarget(e.target)) bumpInputTime(); }, true);
 });
+// Mirror every typed digit / keypad change into the draft store so it
+// survives any DOM rebuild that could otherwise wipe the input value.
+addEventListener('input', e => {
+  const t = e.target;
+  if (!t || !t.classList) return;
+  if (t.classList.contains('pts-inp') && t.id.startsWith('pinp-')) {
+    const tid = t.id.slice(5);
+    voteDrafts[tid] = t.value;
+  } else if (t.classList.contains('bonus-input') && t.id.startsWith('bonus-')) {
+    const tid = t.id.slice(6);
+    bonusDrafts[tid] = t.value;
+  }
+}, true);
 
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
@@ -540,6 +560,72 @@ function startPolling() {
 
 function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+// ═══════════════════════════════════════════════════════
+// SOUND EFFECTS — synthesized via Web Audio so no asset
+// files are needed. AudioContext is lazily resumed on the
+// first user gesture (required by mobile autoplay rules).
+// ═══════════════════════════════════════════════════════
+let audioCtx = null;
+function getAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  } catch(e) { return null; }
+}
+
+function playRocket() {
+  const ctx = getAudio(); if (!ctx) return;
+  const now = ctx.currentTime;
+  // Whoosh — sawtooth sweeping upward
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filt = ctx.createBiquadFilter();
+  filt.type = 'lowpass'; filt.frequency.value = 2200;
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(180, now);
+  osc.frequency.exponentialRampToValueAtTime(1600, now + 0.55);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.20, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.70);
+  osc.connect(filt).connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.75);
+  // Trailing sparkle
+  const o2 = ctx.createOscillator();
+  const g2 = ctx.createGain();
+  o2.type = 'triangle';
+  o2.frequency.setValueAtTime(900, now + 0.4);
+  o2.frequency.exponentialRampToValueAtTime(2200, now + 0.8);
+  g2.gain.setValueAtTime(0.0001, now + 0.4);
+  g2.gain.exponentialRampToValueAtTime(0.10, now + 0.45);
+  g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.85);
+  o2.connect(g2).connect(ctx.destination);
+  o2.start(now + 0.4);
+  o2.stop(now + 0.9);
+}
+
+function playCoin() {
+  const ctx = getAudio(); if (!ctx) return;
+  const now = ctx.currentTime;
+  // Classic two-note coin chime
+  [
+    { f: 988,  t: 0,    d: 0.10 },
+    { f: 1318, t: 0.07, d: 0.22 },
+  ].forEach(n => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = n.f;
+    gain.gain.setValueAtTime(0.0001, now + n.t);
+    gain.gain.exponentialRampToValueAtTime(0.22, now + n.t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + n.t + n.d);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now + n.t);
+    osc.stop(now + n.t + n.d + 0.02);
+  });
 }
 
 async function dbLockTeam(teamId, email, name) {
@@ -806,6 +892,9 @@ async function finishLogin(user) {
   // Viewers have no team — they can only watch.
   myVotedTeams = {};
   TEAMS.forEach(t => myVotedTeams[t.id] = null);
+  // Fresh session — start with no in-progress drafts
+  for (const k in voteDrafts) delete voteDrafts[k];
+  for (const k in bonusDrafts) delete bonusDrafts[k];
   if (user.team) {
     voteLog.forEach(v => {
       if (v.from !== user.team.name) return;
@@ -831,6 +920,8 @@ async function logout() {
   currentUser = null;
   myVotedTeams = {};
   TEAMS.forEach(t => myVotedTeams[t.id] = null);
+  for (const k in voteDrafts) delete voteDrafts[k];
+  for (const k in bonusDrafts) delete bonusDrafts[k];
   stopFW();
   stopSpotlight();
   document.getElementById('champ-banner').classList.remove('show');
@@ -849,14 +940,11 @@ function renderVoteCards() {
   if (!currentUser?.team) { if (section) section.style.display = 'none'; return; }
   if (section) section.style.display = '';
 
-  // Preserve any in-progress typed value AND focus so a re-render (e.g.
-  // from a remote vote arriving while you're keying in your own) doesn't
-  // wipe what you've typed or close the mobile keyboard.
-  const drafts = {};
+  // Capture which input was focused so we can restore focus after the
+  // DOM rebuild. The typed value is already mirrored in voteDrafts.
   let focusedTid = null;
   TEAMS.forEach(t => {
     const inp = document.getElementById('pinp-' + t.id);
-    if (inp && inp.value && !myVotedTeams[t.id]?.confirmed) drafts[t.id] = inp.value;
     if (inp && document.activeElement === inp) focusedTid = t.id;
   });
 
@@ -898,10 +986,14 @@ function renderVoteCards() {
     if (!isOwn) attachKeypadEvents(t);
   });
 
-  // Restore any preserved draft input values after the DOM rebuild
-  for (const tid in drafts) {
-    const inp = document.getElementById('pinp-' + tid);
-    if (inp) inp.value = drafts[tid];
+  // Restore the persistent draft into every un-confirmed vote input
+  // so that any prior DOM rebuild can never visibly clear the value.
+  for (const t of TEAMS) {
+    if (myVotedTeams[t.id]?.confirmed) { delete voteDrafts[t.id]; continue; }
+    const v = voteDrafts[t.id];
+    if (v == null || v === '') continue;
+    const inp = document.getElementById('pinp-' + t.id);
+    if (inp) inp.value = v;
   }
   // Refocus the input that was being typed into so the mobile keyboard
   // doesn't close after a remote-driven re-render.
@@ -1011,6 +1103,7 @@ function syncInp(tid) {
   } else if (warn) {
     warn.textContent = '';
   }
+  voteDrafts[tid] = inp.value;
 }
 
 function kpPress(tid, key) {
@@ -1018,13 +1111,14 @@ function kpPress(tid, key) {
   const warn = document.getElementById('mwarn-' + tid);
   if (!inp || inp.disabled) return;
   let cur = inp.value || '';
-  if (key==='C') { inp.value=''; if(warn) warn.textContent=''; return; }
-  if (key==='⌫') { inp.value=cur.slice(0,-1); if(warn) warn.textContent=''; return; }
+  if (key==='C') { inp.value=''; voteDrafts[tid]=''; if(warn) warn.textContent=''; return; }
+  if (key==='⌫') { inp.value=cur.slice(0,-1); voteDrafts[tid]=inp.value; if(warn) warn.textContent=''; return; }
   // If we're already at the 4-digit ceiling, any extra digit means
   // they're trying to go over 5,000 — flash the warning, don't silently
   // swallow the press.
   if (cur.length >= 4) {
     inp.value = String(MAX_PTS);
+    voteDrafts[tid] = inp.value;
     flashOverLimit(inp, warn);
     return;
   }
@@ -1032,9 +1126,11 @@ function kpPress(tid, key) {
   const v = parseInt(next) || 0;
   if (v > MAX_PTS) {
     inp.value = String(MAX_PTS);
+    voteDrafts[tid] = inp.value;
     flashOverLimit(inp, warn);
   } else {
     inp.value = next;
+    voteDrafts[tid] = next;
     if (warn) warn.textContent = '';
   }
 }
@@ -1047,8 +1143,9 @@ async function confirmPoints(tid) {
   if (pts>MAX_PTS) { showToast(`⚠️ Max ${MAX_PTS.toLocaleString()} pts`, true); return; }
 
   // User just confirmed — drop the editing grace period so the chart
-  // updates from realtime/polling right away.
+  // updates from realtime/polling right away, and clear this team's draft.
   lastInputAt = 0;
+  delete voteDrafts[tid];
 
   // If re-editing an already-confirmed vote, subtract the old amount first
   const wasConfirmed = myVotedTeams[tid]?.confirmed;
@@ -1061,6 +1158,7 @@ async function confirmPoints(tid) {
   const kpWrap = document.getElementById('kp-'+tid) || document.getElementById('sedit-'+tid);
   if (kpWrap) kpWrap.innerHTML = '<div style="text-align:center;padding:.5rem;color:var(--accent);font-family:Orbitron,monospace;font-size:.8rem;">🚀 Launching...</div>';
 
+  playRocket();
   await launchVote(tid, pts);
 }
 
@@ -1107,6 +1205,7 @@ async function launchVote(tid, pts) {
   const tColor = TEAMS.find(t=>t.id===tid)?.color||'#f59e0b';
 
   animRocket(sx,sy,ex,ey,pts,tColor, ()=>{
+    playCoin();
     renderChart();
     renderVoteCards(); // voted card drops to bottom
     updateMatrix();
