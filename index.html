@@ -120,10 +120,10 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .chart-head h2{font-family:'Orbitron',monospace;font-size:.85rem;color:var(--accent);letter-spacing:.05em;}
 .rank-hint{font-size:.72rem;color:var(--muted);font-style:italic;}
 
-.chart-bars{height:320px;padding:1.2rem .6rem 0 3.6rem;position:relative;}
-.chart-grid{position:absolute;left:3.6rem;right:.6rem;top:1.2rem;bottom:0;pointer-events:none;}
+.chart-bars{height:320px;padding:0;position:relative;}
+.chart-grid{position:absolute;left:56px;right:10px;top:20px;bottom:30px;pointer-events:none;}
 .g-line{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.06);}
-.g-lbl{position:absolute;left:-3.1rem;font-size:.62rem;color:var(--muted);transform:translateY(50%);font-family:'Orbitron',monospace;}
+.g-lbl{position:absolute;left:-50px;width:42px;text-align:right;font-size:.62rem;color:var(--muted);transform:translateY(50%);font-family:'Orbitron',monospace;}
 
 /* OLD flex bar-slot removed — now uses absolute positioned bars via JS */
 .bar-val{font-family:'Orbitron',monospace;font-size:clamp(.6rem,1.3vw,.82rem);font-weight:700;text-align:center;min-height:.9em;transition:color .3s;}
@@ -822,15 +822,20 @@ function renderChart(){
   const ranked    = getRanks();
   const n         = TEAMS.length;
   const cW        = container.offsetWidth || 600;
-  const cH        = container.offsetHeight || 300;
-  const leftPad   = 0; // already handled by container padding
-  const gap       = 8;
-  const slotW     = Math.floor((cW - gap*(n-1)) / n);
-  const usableH   = cH - 70; // reserve room for medal, value label, and team label
+  const cH        = container.offsetHeight || 320;
+  // Layout — match the chart-grid offsets in CSS so bars and grid align
+  const leftGutter   = 56;
+  const rightPad     = 10;
+  const topPad       = 20;
+  const bottomReserve = 30; // room for the team-name label below bars
+  const gap          = 8;
+  const slotW        = Math.floor((cW - leftGutter - rightPad - gap*(n-1)) / n);
+  const gridH        = cH - topPad - bottomReserve;
+  const usableH      = gridH - 36; // reserve room above bar for medal + value
   const maxV = Math.max(...TEAMS.map(t=>votes[t.id]||0), 1);
   const cMax = maxV * 1.15;
 
-  // Grid lines (redrawn)
+  // Grid lines + y-axis labels (positioned inside the grid box defined in CSS)
   const grid = document.getElementById('chart-grid');
   grid.innerHTML = '';
   [0,.25,.5,.75,1].forEach(f=>{
@@ -847,7 +852,7 @@ function renderChart(){
     const val    = votes[t.id] || 0;
     const bH     = Math.max((val/cMax)*usableH, val>0?10:0);
     const isChamp= rankIdx===0 && val>0;
-    const leftX  = rankIdx * (slotW + gap);
+    const leftX  = leftGutter + rankIdx * (slotW + gap);
 
     let slot = document.getElementById('barslot-'+t.id);
     if (!slot) {
