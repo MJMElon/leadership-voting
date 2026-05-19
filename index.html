@@ -50,6 +50,9 @@
   --text:#f1f5f9;--muted:#a3b2c7;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
+/* Kill the 300ms double-tap-zoom delay on touch devices for buttons + inputs
+   so tapping the keypad fast doesn't pinch-zoom the page on phones. */
+button,input,select,textarea,.kp-btn,.team-pick-btn,.btn-launch,.btn-continue,.btn-cancel,.btn-logout,.btn-viewer,.bonus-input,.pts-inp,.voted-lock-icon{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;}
 body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,#0c0820 0%,transparent 45%),radial-gradient(ellipse at 80% 20%,#080f1f 0%,transparent 35%);pointer-events:none;opacity:.45;}
 
@@ -212,7 +215,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 /* bonus row */
 .bonus-row td{background:linear-gradient(135deg,rgba(255,215,0,.05),transparent);border-bottom:1px solid #2d3748;}
 .bonus-cell{padding:.4rem .35rem !important;}
-.bonus-input{width:62px;background:var(--surface2);border:1px solid #2d3748;border-radius:.4rem;color:var(--gold);font-family:'Orbitron',monospace;font-weight:700;font-size:.85rem;padding:.32rem .35rem;text-align:center;outline:none;transition:border-color .15s,box-shadow .15s;}
+.bonus-input{width:62px;background:var(--surface2);border:1px solid #2d3748;border-radius:.4rem;color:var(--gold);font-family:'Orbitron',monospace;font-weight:700;font-size:16px;padding:.32rem .35rem;text-align:center;outline:none;transition:border-color .15s,box-shadow .15s;}
 .bonus-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,215,0,.18);}
 .bonus-input::-webkit-inner-spin-button,.bonus-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
 .bonus-input{-moz-appearance:textfield;}
@@ -223,7 +226,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .bar-fill-wrap{width:100%;display:flex;align-items:flex-end;transition:height .6s cubic-bezier(.22,1,.36,1);}
 .bar-fill{width:100%;border-radius:4px 4px 0 0;transition:height .6s cubic-bezier(.22,1,.36,1);}
 .bar-fill.champ-bar{animation:bglow 1.5s ease-in-out infinite;}
-@keyframes bglow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.4) drop-shadow(0 0 14px currentColor)}}
+@keyframes bglow{0%,100%{filter:brightness(1.05) drop-shadow(0 0 8px currentColor)}50%{filter:brightness(1.45) drop-shadow(0 0 22px currentColor) drop-shadow(0 0 38px currentColor)}}
 
 /* rocket */
 .rocket-fly{position:fixed;pointer-events:none;font-size:1.5rem;z-index:997;}
@@ -408,6 +411,18 @@ function getTeamOwnerEmail(teamId) {
 
 const ourVoteIds = new Set();
 
+// Render that's safe to call from remote events — skips heavy re-renders
+// while the user is mid-typing so their input doesn't get blown away.
+function rerenderRemote() {
+  if (!currentUser) return;
+  renderChart();
+  checkChampion();
+  if (!isUserEditing()) {
+    renderVoteCards();
+    updateMatrix();
+  }
+}
+
 function subscribeRealtime() {
   if (!dbClient) return;
   dbClient.channel('votes-rt')
@@ -427,7 +442,7 @@ function subscribeRealtime() {
         const tName = TEAMS.find(t=>t.id===v.to_team_id)?.name||'';
         voteLog.unshift({id:v.id, voter:v.voter_name, email:v.voter_email, from:v.from_team, to:tName, pts:v.points, time:new Date(v.created_at).toLocaleTimeString()});
       }
-      if (currentUser) { renderChart(); renderVoteCards(); updateMatrix(); checkChampion(); }
+      rerenderRemote();
     })
     .on('postgres_changes',{event:'DELETE',schema:'public',table:'votes'}, payload => {
       // payload.old usually contains only the primary key unless the table has REPLICA IDENTITY FULL
@@ -439,7 +454,7 @@ function subscribeRealtime() {
       const target = TEAMS.find(t => t.name === entry.to);
       if (target) votes[target.id] = Math.max(0, (votes[target.id]||0) - entry.pts);
       voteLog.splice(idx, 1);
-      if (currentUser) { renderChart(); renderVoteCards(); updateMatrix(); checkChampion(); }
+      rerenderRemote();
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'sessions'}, payload => {
       const newEmail = payload.new.email;
@@ -449,8 +464,10 @@ function subscribeRealtime() {
           const t = TEAMS.find(x => x.id === payload.new.team_id);
           showToast(`🎉 ${newEmail} claimed ${t?.name || 'a team'}`);
         }
-        renderVoteCards();
-        updateMatrix();
+        if (!isUserEditing()) {
+          renderVoteCards();
+          updateMatrix();
+        }
       }
     })
     .subscribe((status, err) => {
@@ -493,10 +510,7 @@ function startPolling() {
           if (target) myVotedTeams[target.id] = { pts: v.pts, confirmed: true };
         });
       }
-      renderChart();
-      renderVoteCards();
-      updateMatrix();
-      checkChampion();
+      rerenderRemote();
     } catch(e) { /* swallow transient errors */ }
   }, POLL_MS);
 }
@@ -1171,19 +1185,47 @@ function startSpotlight(leaderTeam){
     spX.clearRect(0,0,spC.width,spC.height);
     const barEl = document.getElementById('barslot-'+leaderTeam.id);
     if(!barEl){spRaf=requestAnimationFrame(drawSpot);return;}
+    const chartEl = document.getElementById('chart-bars');
     const r = barEl.getBoundingClientRect();
+    const chartR = chartEl ? chartEl.getBoundingClientRect() : null;
     const bx = r.left + r.width/2;
     const by = r.top;
 
     spAngle += 0.04;
-    // Soft pulsing halo at the bar top — no beams that obscure text above
-    const haloR = 45 + Math.sin(spAngle)*8;
+
+    // Downward stage-light cone — narrow at the top of the chart, fanning
+    // out over the leader bar. Stays inside the chart area so it doesn't
+    // cover the "LIVE STANDINGS" title above.
+    if (chartR) {
+      const coneTop        = chartR.top + 2;
+      const coneTopWidth   = 22;
+      const coneBottomWidth= r.width * 1.05;
+      const coneBottom     = by + r.height * 0.7;
+      spX.save();
+      spX.globalAlpha = 0.32 + Math.sin(spAngle*2)*0.08;
+      spX.beginPath();
+      spX.moveTo(bx - coneTopWidth/2, coneTop);
+      spX.lineTo(bx + coneTopWidth/2, coneTop);
+      spX.lineTo(bx + coneBottomWidth/2, coneBottom);
+      spX.lineTo(bx - coneBottomWidth/2, coneBottom);
+      spX.closePath();
+      const grd = spX.createLinearGradient(bx, coneTop, bx, coneBottom);
+      grd.addColorStop(0,    color+'cc');
+      grd.addColorStop(0.5,  color+'55');
+      grd.addColorStop(1,    color+'00');
+      spX.fillStyle = grd;
+      spX.fill();
+      spX.restore();
+    }
+
+    // Bright pulsing halo at the bar top
+    const haloR = 52 + Math.sin(spAngle)*10;
     const halo = spX.createRadialGradient(bx,by,0,bx,by,haloR);
-    halo.addColorStop(0,  color+'55');
-    halo.addColorStop(0.5,color+'22');
+    halo.addColorStop(0,  color+'aa');
+    halo.addColorStop(0.4,color+'55');
     halo.addColorStop(1,  color+'00');
     spX.save();
-    spX.globalAlpha = 0.7;
+    spX.globalAlpha = 0.8;
     spX.beginPath(); spX.arc(bx,by,haloR,0,Math.PI*2); spX.fillStyle=halo; spX.fill();
     spX.restore();
 
@@ -1202,13 +1244,23 @@ function stopSpotlight(){
 // ═══════════════════════════════════════════════════════
 // CHAMPION CHECK
 // ═══════════════════════════════════════════════════════
+let lastChampionId = null;
 function checkChampion(){
   const top=getRanks()[0];
-  if(!top||votes[top.id]===0){document.getElementById('champ-banner').classList.remove('show');return;}
+  if(!top||votes[top.id]===0){
+    document.getElementById('champ-banner').classList.remove('show');
+    lastChampionId = null;
+    return;
+  }
   document.getElementById('champ-name').textContent=top.emoji+' '+top.name;
   document.getElementById('champ-pts').textContent='Total Points: '+votes[top.id].toLocaleString()+' pts';
   document.getElementById('champ-banner').classList.add('show');
-  launchFW(top.color);
+  // Only launch fireworks on a real change of leader, otherwise every realtime
+  // event would re-trigger them and the page jams.
+  if (top.id !== lastChampionId) {
+    lastChampionId = top.id;
+    launchFW(top.color);
+  }
 }
 
 // ═══════════════════════════════════════════════════════
