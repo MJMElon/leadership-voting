@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morning Briefing Leadership Training Voting System</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+
+<!-- ══ SUPABASE CONFIG — replace with your own project values ══
+     1. Go to https://supabase.com → your project → Settings → API
+     2. Copy "Project URL" and "anon public" key and paste below
+     3. Then run this SQL in your Supabase SQL editor:
+
+     create table if not exists sessions (
+       team_id   int primary key,
+       email     text not null,
+       name      text not null,
+       locked_at timestamptz default now()
+     );
+     create table if not exists votes (
+       id         serial primary key,
+       voter_email text not null,
+       voter_name  text not null,
+       from_team   text not null,
+       to_team_id  int not null,
+       points      int not null,
+       created_at  timestamptz default now()
+     );
+     -- Allow anon reads and inserts (for demo; restrict in production)
+     alter table sessions enable row level security;
+     alter table votes    enable row level security;
+     create policy "allow all" on sessions for all using (true) with check (true);
+     create policy "allow all" on votes    for all using (true) with check (true);
+-->
+<script>
+  const SUPABASE_URL = 'https://sseqnlnuwauksmrrliyc.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_5bB1fm_MLmVgNr1hPDRSqQ_6Qo7zkXC';
+  const USE_SUPABASE  = true;
+</script>
+
+<style>
+:root{
+  --bg:#0a0e1a;--surface:#111827;--surface2:#1e2d40;
+  --accent:#f59e0b;--accent2:#ef4444;--gold:#ffd700;
+  --text:#e2e8f0;--muted:#64748b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,#1a1040 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,#0c1a30 0%,transparent 40%);pointer-events:none;}
+
+/* layers */
+#fw-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999;}
+#spotlight-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:990;}
+#rocket-layer{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:998;}
+
+/* toast */
+.toast{position:fixed;bottom:2rem;right:1.5rem;background:var(--surface);border:1px solid var(--accent);color:var(--text);padding:.85rem 1.5rem;border-radius:.75rem;font-family:'Rajdhani',sans-serif;font-size:1rem;z-index:700;transform:translateY(130%);transition:transform .35s cubic-bezier(.22,1,.36,1);max-width:300px;box-shadow:0 4px 20px rgba(0,0,0,.5);}
+.toast.show{transform:translateY(0);}
+.toast.error{border-color:var(--accent2);}
+
+/* header */
+.page-header{text-align:center;padding:2rem 1rem 1rem;}
+.trophy-icon{font-size:2.2rem;display:block;margin-bottom:.4rem;animation:floatT 3s ease-in-out infinite;}
+@keyframes floatT{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.page-header h1{font-family:'Orbitron',monospace;font-size:clamp(.85rem,2.4vw,1.7rem);font-weight:900;background:linear-gradient(135deg,var(--gold),var(--accent),#ff6b35);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:.04em;line-height:1.4;}
+.page-header p{color:var(--muted);font-size:.82rem;margin-top:.35rem;letter-spacing:.15em;text-transform:uppercase;}
+
+/* auth */
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:75vh;gap:1.4rem;padding:2rem;}
+.auth-card{background:var(--surface);border:1px solid #2d3748;border-radius:1.2rem;padding:2.4rem;max-width:390px;width:100%;text-align:center;box-shadow:0 0 40px rgba(245,158,11,.06);}
+.auth-card h2{font-family:'Orbitron',monospace;font-size:.95rem;color:var(--accent);margin-bottom:1.3rem;letter-spacing:.1em;}
+.gmail-row{display:flex;align-items:center;gap:.55rem;justify-content:center;margin-bottom:1rem;}
+.gmail-row span{color:var(--muted);font-size:.85rem;}
+.field-lbl{display:block;text-align:left;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.32rem;}
+.email-inp{width:100%;background:var(--surface2);border:1px solid #2d3748;border-radius:.6rem;padding:.72rem 1rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:1rem;outline:none;transition:border-color .2s,box-shadow .2s;}
+.email-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.15);}
+.email-inp::placeholder{color:var(--muted);}
+.btn-continue{display:flex;align-items:center;justify-content:center;gap:.5rem;background:linear-gradient(135deg,var(--accent),#f97316);color:#000;font-family:'Orbitron',monospace;font-weight:700;font-size:.88rem;border:none;border-radius:.6rem;padding:.78rem 1.5rem;width:100%;cursor:pointer;margin-top:.7rem;letter-spacing:.05em;transition:box-shadow .2s,transform .15s;}
+.btn-continue:hover{box-shadow:0 4px 20px rgba(245,158,11,.4);transform:translateY(-1px);}
+
+/* team modal */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:500;align-items:center;justify-content:center;}
+.modal-ov.open{display:flex;}
+.modal-box{background:var(--surface);border:1px solid var(--accent);border-radius:1.2rem;padding:1.8rem;max-width:370px;width:90%;box-shadow:0 0 40px rgba(245,158,11,.2);}
+.modal-box h3{font-family:'Orbitron',monospace;color:var(--accent);margin-bottom:.4rem;font-size:.95rem;}
+.modal-box p{color:var(--muted);font-size:.82rem;margin-bottom:1rem;}
+.team-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.7rem;}
+.team-pick-btn{background:var(--surface2);border:1px solid #2d3748;border-radius:.55rem;color:var(--text);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:.92rem;padding:.62rem .5rem;cursor:pointer;transition:background .12s,border-color .12s;position:relative;}
+.team-pick-btn:not(:disabled):hover{background:var(--accent);color:#000;border-color:var(--accent);}
+.team-pick-btn:disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through;}
+.taken-lbl{font-size:.6rem;color:var(--accent2);display:block;margin-top:.15rem;}
+.btn-cancel{width:100%;background:transparent;border:1px solid #2d3748;color:var(--muted);border-radius:.45rem;padding:.42rem;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:.82rem;transition:all .2s;}
+.btn-cancel:hover{border-color:var(--accent2);color:var(--accent2);}
+
+/* main app */
+#main-app{display:none;padding:0 1rem 3rem;}
+
+/* user bar */
+.user-bar{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-bottom:1px solid #2d3748;padding:.65rem 1.4rem;margin-bottom:1.2rem;}
+.u-info{display:flex;align-items:center;gap:.6rem;}
+.u-avatar{width:33px;height:33px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#ef4444);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.92rem;color:#000;}
+.u-name{font-weight:600;font-size:.92rem;}
+.u-team-pill{font-size:.72rem;color:var(--muted);background:var(--surface2);padding:.13rem .48rem;border-radius:99px;}
+.btn-logout{background:transparent;border:1px solid #2d3748;color:var(--muted);border-radius:.4rem;padding:.26rem .65rem;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:.8rem;transition:all .2s;}
+.btn-logout:hover{border-color:var(--accent2);color:var(--accent2);}
+
+/* champion banner */
+#champ-banner{display:none;text-align:center;padding:1.3rem;margin:0 auto 1.8rem;max-width:700px;background:linear-gradient(135deg,#1a1200,#2d1f00,#1a1200);border:2px solid var(--gold);border-radius:1.2rem;}
+#champ-banner.show{display:block;animation:pulseG 2s ease-in-out infinite;}
+@keyframes pulseG{0%,100%{box-shadow:0 0 28px rgba(255,215,0,.2)}50%{box-shadow:0 0 55px rgba(255,215,0,.5)}}
+#champ-banner h2{font-family:'Orbitron',monospace;font-size:clamp(1rem,2.8vw,1.7rem);color:var(--gold);margin-bottom:.22rem;}
+#champ-banner p{color:#e2c97c;font-size:.95rem;}
+.crown{font-size:2rem;display:inline-block;animation:floatT 2s ease-in-out infinite;}
+
+/* chart */
+.chart-wrap{max-width:960px;margin:0 auto 1.8rem;background:var(--surface);border:1px solid #2d3748;border-radius:1.2rem;padding:1.3rem;}
+.chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;flex-wrap:wrap;gap:.4rem;}
+.chart-head h2{font-family:'Orbitron',monospace;font-size:.85rem;color:var(--accent);letter-spacing:.05em;}
+.total-badge{background:var(--surface2);border:1px solid #2d3748;padding:.22rem .65rem;border-radius:99px;font-size:.78rem;color:var(--muted);}
+.total-badge span{color:var(--text);font-weight:700;}
+.rank-hint{font-size:.72rem;color:var(--muted);font-style:italic;}
+
+.chart-bars{height:300px;padding:0 .5rem 0 2.8rem;position:relative;}
+.chart-grid{position:absolute;left:2.8rem;right:.5rem;top:0;bottom:0;pointer-events:none;}
+.g-line{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.05);}
+.g-lbl{position:absolute;left:-2.4rem;font-size:.58rem;color:var(--muted);transform:translateY(50%);font-family:'Orbitron',monospace;}
+
+/* OLD flex bar-slot removed — now uses absolute positioned bars via JS */
+.bar-val{font-family:'Orbitron',monospace;font-size:clamp(.46rem,1.1vw,.65rem);font-weight:700;text-align:center;min-height:.9em;transition:color .3s;}
+.bar-lbl{font-family:'Orbitron',monospace;font-size:clamp(.68rem,1.4vw,.95rem);font-weight:700;text-align:center;padding-bottom:.15rem;transition:color .3s;line-height:1.35;}
+.bar-emoji{font-size:clamp(.9rem,1.8vw,1.25rem);display:block;margin-bottom:.08rem;}
+.rank-medal{font-size:1rem;line-height:1;}
+
+/* vote cards */
+.vote-section{max-width:960px;margin:0 auto 1.5rem;}
+.vote-section>h2{font-family:'Orbitron',monospace;font-size:.88rem;color:var(--accent);margin-bottom:.35rem;letter-spacing:.05em;}
+.vote-section>p{color:var(--muted);font-size:.84rem;margin-bottom:.9rem;}
+.vote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:.85rem;}
+
+.vote-card{background:var(--surface);border:1px solid #2d3748;border-radius:.95rem;padding:1rem;transition:border-color .2s,box-shadow .2s,opacity .5s;}
+.vote-card:hover:not(.is-own):not(.is-locked){border-color:var(--accent);box-shadow:0 0 12px rgba(245,158,11,.1);}
+.vote-card.is-own{opacity:.38;pointer-events:none;}
+.vote-card.is-locked{opacity:.6;border-color:#1e3a2a;}
+.vote-card.is-voted-done{border-color:#34d39944;background:linear-gradient(135deg,var(--surface),#0a1a10);}
+
+.tc-hdr{display:flex;align-items:center;gap:.55rem;margin-bottom:.7rem;}
+.tc-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.tc-name{font-family:'Orbitron',monospace;font-size:.78rem;font-weight:700;flex:1;}
+.tc-rank{font-size:.95rem;}
+.badge-sm{font-size:.62rem;padding:.07rem .38rem;border-radius:99px;border:1px solid;}
+.badge-voted{background:#0f2820;color:#34d399;border-color:#34d39955;}
+.badge-own{background:#1a2535;color:var(--muted);border-color:#2d3748;}
+.badge-taken{background:#1f1010;color:#f87171;border-color:#f8717155;}
+.tc-total{font-size:.68rem;color:var(--muted);margin-bottom:.5rem;font-family:'Orbitron',monospace;}
+.tc-total span{font-weight:700;}
+
+/* keypad */
+.kp-wrap{display:flex;flex-direction:column;gap:.48rem;}
+.pts-inp{width:100%;background:var(--surface2);border:1px solid #2d3748;border-radius:.5rem;padding:.48rem .7rem;color:var(--accent);font-family:'Orbitron',monospace;font-size:1.05rem;font-weight:700;outline:none;text-align:center;transition:border-color .2s,box-shadow .2s;}
+.pts-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.15);}
+.pts-inp::placeholder{color:#334155;font-size:.72rem;}
+.pts-inp:disabled{opacity:.5;cursor:not-allowed;}
+.pts-inp.confirmed{border-color:#34d399;color:#34d399;}
+.kp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.28rem;}
+.kp-btn{background:var(--surface2);border:1px solid #1e2d40;color:var(--text);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:.92rem;padding:.44rem 0;border-radius:.4rem;cursor:pointer;transition:background .1s;}
+.kp-btn:hover:not(:disabled){background:#273549;}
+.kp-btn:active:not(:disabled){background:#1e3050;}
+.kp-btn:disabled{opacity:.3;cursor:not-allowed;}
+.kp-del{color:#f87171;}
+.kp-clr{color:var(--muted);font-size:.78rem;}
+.btn-launch{width:100%;background:linear-gradient(135deg,var(--accent),#f97316);border:none;color:#000;font-family:'Orbitron',monospace;font-weight:700;font-size:.78rem;padding:.55rem;border-radius:.48rem;cursor:pointer;letter-spacing:.04em;transition:opacity .2s,transform .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;}
+.btn-launch:hover:not(:disabled){transform:translateY(-1px);opacity:.9;}
+.btn-launch:disabled{opacity:.3;cursor:not-allowed;transform:none;}
+/* voted state — permanent, hidden-edit secret */
+.voted-panel{background:linear-gradient(135deg,#0a1f14,#0d2318);border:1px solid #34d39955;border-radius:.6rem;padding:1rem;text-align:center;position:relative;}
+.voted-pts-label{font-size:.65rem;color:#34d399;font-family:'Rajdhani',sans-serif;text-transform:uppercase;letter-spacing:.12em;margin-bottom:.2rem;}
+.voted-pts-value{font-family:'Orbitron',monospace;font-size:1.8rem;font-weight:900;color:#34d399;line-height:1;text-shadow:0 0 12px rgba(52,211,153,.4);}
+.voted-pts-sub{font-size:.65rem;color:#34d39988;font-family:'Rajdhani',sans-serif;margin-top:.15rem;letter-spacing:.06em;}
+.voted-lock-icon{font-size:1.4rem;margin-bottom:.3rem;display:block;cursor:default;user-select:none;}
+/* secret edit panel — shown after 5 taps on lock icon */
+.secret-edit{display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px dashed #34d39933;}
+.secret-edit.open{display:block;}
+.secret-hint{font-size:.6rem;color:#34d39966;text-align:center;margin-bottom:.5rem;font-family:'Rajdhani',sans-serif;letter-spacing:.08em;}
+
+/* blink-over animation for over-limit input */
+@keyframes blinkRed{0%,100%{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(239,68,68,.3)}50%{border-color:#ff9999;box-shadow:0 0 0 6px rgba(239,68,68,.1)}}
+.pts-inp.over-limit{animation:blinkRed .25s ease-in-out 4;border-color:var(--accent2);}
+.max-warn{font-size:.65rem;color:var(--accent2);text-align:center;font-family:'Rajdhani',sans-serif;letter-spacing:.05em;min-height:.9rem;transition:opacity .3s;}
+
+/* VOTE MATRIX TABLE */
+.matrix-wrap{max-width:960px;margin:1.5rem auto 0;background:var(--surface);border:1px solid #2d3748;border-radius:.95rem;overflow:hidden;}
+.matrix-hdr{padding:.85rem 1.3rem;border-bottom:1px solid #2d3748;font-family:'Orbitron',monospace;font-size:.8rem;color:var(--accent);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.4rem;}
+.matrix-sub{color:var(--muted);font-size:.72rem;font-family:'Rajdhani',sans-serif;}
+.matrix-table{width:100%;border-collapse:collapse;font-size:.8rem;}
+.matrix-table th{padding:.55rem .7rem;background:var(--surface2);text-align:center;font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);white-space:nowrap;}
+.matrix-table th.row-hdr{text-align:left;min-width:130px;}
+.matrix-table td{padding:.5rem .7rem;border-bottom:1px solid rgba(45,55,72,.4);text-align:center;vertical-align:middle;}
+.matrix-table td.voter-cell{text-align:left;padding-left:.9rem;}
+.voter-name{font-weight:600;font-size:.82rem;color:var(--text);}
+.voter-email{font-size:.65rem;color:var(--muted);display:block;margin-top:.05rem;}
+.voter-team-badge{font-size:.62rem;padding:.06rem .35rem;border-radius:99px;border:1px solid;display:inline-block;margin-top:.15rem;}
+.tick-cell{font-size:1.1rem;line-height:1;}
+.tick-yes{color:#34d399;}
+.tick-no{color:#334155;font-size:.7rem;}
+.own-cell{color:#334155;font-size:.85rem;}
+
+/* smooth bar slot transitions using CSS left positioning */
+#chart-bars{position:relative;}
+.bar-slot{position:absolute;bottom:0;top:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.3rem;transition:left .7s cubic-bezier(.4,0,.2,1),width .7s cubic-bezier(.4,0,.2,1);}
+.bar-fill-wrap{width:100%;flex:1;display:flex;align-items:flex-end;}
+.bar-fill{width:100%;border-radius:4px 4px 0 0;transition:height .6s cubic-bezier(.22,1,.36,1);}
+.bar-fill.champ-bar{animation:bglow 1.5s ease-in-out infinite;}
+@keyframes bglow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.4) drop-shadow(0 0 14px currentColor)}}
+
+/* rocket */
+.rocket-fly{position:fixed;pointer-events:none;font-size:1.5rem;z-index:997;}
+.pts-pop{position:fixed;pointer-events:none;font-family:'Orbitron',monospace;font-weight:900;font-size:1rem;text-shadow:0 0 8px currentColor;z-index:996;}
+
+/* supabase notice */
+.db-notice{max-width:960px;margin:0 auto 1rem;background:#1a1f0a;border:1px solid #4a5530;border-radius:.7rem;padding:.7rem 1rem;font-size:.78rem;color:#a3b86c;display:flex;align-items:center;gap:.5rem;}
+.db-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;animation:blink 1.5s infinite;}
+.db-dot.off{background:#f87171;animation:none;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+@media(max-width:600px){.chart-bars{height:220px;}.vote-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<canvas id="fw-canvas"></canvas>
+<canvas id="spotlight-canvas"></canvas>
+<div id="rocket-layer"></div>
+<div class="toast" id="toast"></div>
+
+<!-- ══ AUTH ══ -->
+<div id="auth-screen">
+  <div class="page-header">
+    <span class="trophy-icon">🏆</span>
+    <h1>MORNING BRIEFING<br>LEADERSHIP TRAINING<br>VOTING SYSTEM</h1>
+    <p>Cast your points &bull; Decide the champion</p>
+  </div>
+  <div class="auth-card">
+    <h2>⚡ SIGN IN TO VOTE</h2>
+    <div class="gmail-row">
+      <svg width="19" height="19" viewBox="0 0 24 24"><path fill="#EA4335" d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/><path fill="#34A853" d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/><path fill="#4A90D9" d="M19.834 21c2.195-2.048 3.62-5.096 3.62-9 0-.71-.109-1.473-.272-2.182H12v4.637h6.436c-.317 1.559-1.17 2.766-2.395 3.558L19.834 21Z"/><path fill="#FBBC05" d="M5.277 14.268A7.12 7.12 0 0 1 4.909 12c0-.782.125-1.533.357-2.235L1.24 6.65A11.934 11.934 0 0 0 0 12c0 1.92.445 3.73 1.237 5.335l4.04-3.067Z"/></svg>
+      <span>Enter your Gmail address to continue</span>
+    </div>
+    <label class="field-lbl" for="email-inp">Gmail Address</label>
+    <input type="email" class="email-inp" id="email-inp" placeholder="yourname@gmail.com" autocomplete="email"
+      onkeydown="if(event.key==='Enter')proceedEmail()">
+    <button class="btn-continue" onclick="proceedEmail()">Continue →</button>
+  </div>
+</div>
+
+<!-- ══ TEAM MODAL ══ -->
+<div class="modal-ov" id="team-modal">
+  <div class="modal-box">
+    <h3>🏅 SELECT YOUR TEAM</h3>
+    <p>You can only vote for other teams. Each team slot can only be taken once.</p>
+    <div class="team-grid" id="team-grid"></div>
+    <button class="btn-cancel" onclick="document.getElementById('team-modal').classList.remove('open')">Cancel</button>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div id="main-app">
+  <div class="user-bar">
+    <div class="u-info">
+      <div class="u-avatar" id="u-avatar">?</div>
+      <div>
+        <div class="u-name" id="u-name">–</div>
+        <div class="u-team-pill" id="u-team">–</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="page-header" style="padding:.5rem 1rem 1rem;">
+    <h1>MORNING BRIEFING · LEADERSHIP TRAINING VOTING SYSTEM</h1>
+  </div>
+
+  <div class="db-notice" id="db-notice">
+    <div class="db-dot off" id="db-dot"></div>
+    <span id="db-status">Local mode — configure Supabase URL & KEY to enable live sync</span>
+  </div>
+
+  <div id="champ-banner">
+    <span class="crown">👑</span>
+    <h2>🎉 CHAMPION: <span id="champ-name">–</span> 🎉</h2>
+    <p id="champ-pts">–</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-head">
+      <h2>📊 LIVE STANDINGS</h2>
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+        <span class="rank-hint">🔄 Bars sort by rank — leader always leftmost</span>
+        <div class="total-badge">Total: <span id="total-pts">0</span> pts</div>
+      </div>
+    </div>
+    <div class="chart-bars" id="chart-bars">
+      <div class="chart-grid" id="chart-grid"></div>
+    </div>
+  </div>
+
+  <div class="vote-section">
+    <h2>🗳️ CAST YOUR VOTES</h2>
+    <p>Type or tap points (max 5,000 per team). Press <strong style="color:var(--accent)">Enter</strong> or tap 🚀 to confirm. You can edit before launching.</p>
+    <div class="vote-grid" id="vote-grid"></div>
+  </div>
+
+  <div class="matrix-wrap" id="matrix-wrap" style="display:none;">
+    <div class="matrix-hdr">
+      📋 VOTE STATUS BOARD
+      <span class="matrix-sub" id="matrix-sub">0 / 0 teams voted</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="matrix-table" id="matrix-table">
+        <thead id="matrix-thead"></thead>
+        <tbody id="matrix-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════
+const TEAMS = [
+  {id:1, name:'Team 1', emoji:'🔥', color:'#f59e0b'},
+  {id:2, name:'Team 2', emoji:'⚡', color:'#10b981'},
+  {id:3, name:'Team 3', emoji:'🌊', color:'#6366f1'},
+  {id:4, name:'Team 4', emoji:'🦁', color:'#ef4444'},
+  {id:5, name:'Team 5', emoji:'🌟', color:'#ec4899'},
+  {id:6, name:'Team 6', emoji:'🦅', color:'#14b8a6'},
+];
+const MAX_PTS = 5000;
+const FW_DURATION_MS = 8000; // fireworks auto-stop after 8s
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let currentUser   = null;
+let votes         = {};   // teamId -> total points
+let voteLog       = [];
+let myVotedTeams  = {};   // teamId -> {pts, confirmed}  (this session's votes)
+let takenTeams    = {};   // teamId -> email (locked slots)
+let dbClient      = null;
+
+TEAMS.forEach(t => { votes[t.id] = 0; myVotedTeams[t.id] = null; });
+
+// ═══════════════════════════════════════════════════════
+// SUPABASE INIT
+// ═══════════════════════════════════════════════════════
+async function initSupabase() {
+  if (!USE_SUPABASE) return;
+  try {
+    const mod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    dbClient = mod.createClient(SUPABASE_URL, SUPABASE_KEY);
+    setDbStatus(true, 'Supabase connected — live sync active');
+    await loadFromSupabase();
+    subscribeRealtime();
+  } catch(e) {
+    setDbStatus(false, 'Supabase error: ' + e.message);
+    console.error('Supabase init failed:', e);
+  }
+}
+
+function setDbStatus(ok, msg) {
+  document.getElementById('db-dot').className = 'db-dot' + (ok ? '' : ' off');
+  document.getElementById('db-status').textContent = msg;
+}
+
+async function loadFromSupabase() {
+  if (!dbClient) return;
+  // Load sessions (taken teams)
+  const {data: sessions} = await dbClient.from('sessions').select('*');
+  takenTeams = {};
+  (sessions||[]).forEach(s => takenTeams[s.team_id] = s.email);
+  // Load votes
+  const {data: vrows} = await dbClient.from('votes').select('*').order('created_at',{ascending:false});
+  votes = {};
+  TEAMS.forEach(t => votes[t.id] = 0);
+  voteLog = [];
+  (vrows||[]).forEach(v => {
+    votes[v.to_team_id] = (votes[v.to_team_id]||0) + v.points;
+    voteLog.push({voter:v.voter_name, email:v.voter_email, from:v.from_team, to:TEAMS.find(t=>t.id===v.to_team_id)?.name||v.to_team_id, pts:v.points, time:new Date(v.created_at).toLocaleTimeString()});
+  });
+}
+
+function subscribeRealtime() {
+  if (!dbClient) return;
+  dbClient.channel('votes-rt').on('postgres_changes',{event:'INSERT',schema:'public',table:'votes'}, payload => {
+    const v = payload.new;
+    votes[v.to_team_id] = (votes[v.to_team_id]||0) + v.points;
+    const tName = TEAMS.find(t=>t.id===v.to_team_id)?.name||'';
+    voteLog.unshift({voter:v.voter_name, email:v.voter_email, from:v.from_team, to:tName, pts:v.points, time:new Date(v.created_at).toLocaleTimeString()});
+    if (currentUser) { renderChart(); renderVoteCards(); updateMatrix(); checkChampion(); }
+  }).on('postgres_changes',{event:'INSERT',schema:'public',table:'sessions'}, payload => {
+    takenTeams[payload.new.team_id] = payload.new.email;
+    if (currentUser) renderVoteCards();
+  }).subscribe();
+}
+
+async function dbLockTeam(teamId, email, name) {
+  if (!dbClient) { takenTeams[teamId] = email; return true; }
+  // Check if already taken (race condition guard)
+  const {data} = await dbClient.from('sessions').select('email').eq('team_id', teamId).single();
+  if (data) return false; // already taken
+  const {error} = await dbClient.from('sessions').insert({team_id:teamId, email, name});
+  if (!error) takenTeams[teamId] = email;
+  return !error;
+}
+
+async function dbSaveVote(toTeamId, pts) {
+  if (!dbClient) return true;
+  const {error} = await dbClient.from('votes').insert({
+    voter_email: currentUser.email,
+    voter_name:  currentUser.name,
+    from_team:   currentUser.team.name,
+    to_team_id:  toTeamId,
+    points:      pts
+  });
+  return !error;
+}
+
+async function dbUnlockTeam(teamId) {
+  if (!dbClient) { delete takenTeams[teamId]; return; }
+  await dbClient.from('sessions').delete().eq('team_id', teamId);
+  delete takenTeams[teamId];
+}
+
+// ═══════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════
+function proceedEmail() {
+  const inp = document.getElementById('email-inp');
+  const email = inp.value.trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    inp.style.borderColor = 'var(--accent2)';
+    showToast('⚠️ Enter a valid email address', true);
+    setTimeout(() => inp.style.borderColor = '', 1600);
+    return;
+  }
+  // Check if this email already has a session
+  const existingTeamId = Object.keys(takenTeams).find(k => takenTeams[k] === email);
+  if (existingTeamId) {
+    showToast('⚠️ This email is already logged in. Please use a different email.', true);
+    return;
+  }
+  const raw  = email.split('@')[0].replace(/[._+]/g,' ');
+  const name = raw.replace(/\b\w/g, c => c.toUpperCase());
+  openTeamModal({ name, email, avatar: name[0].toUpperCase() });
+}
+
+function openTeamModal(partial) {
+  window._pending = partial;
+  const grid = document.getElementById('team-grid');
+  grid.innerHTML = '';
+  TEAMS.forEach(t => {
+    const taken = !!takenTeams[t.id];
+    const btn = document.createElement('button');
+    btn.className = 'team-pick-btn';
+    btn.disabled = taken;
+    btn.style.borderColor = t.color + '44';
+    btn.innerHTML = `${t.emoji} ${t.name}${taken ? '<span class="taken-lbl">🔒 Taken</span>' : ''}`;
+    btn.onclick = async () => {
+      btn.disabled = true;
+      btn.textContent = '⏳ Claiming...';
+      const ok = await dbLockTeam(t.id, partial.email, partial.name);
+      if (!ok) {
+        showToast('⚠️ Team just taken by someone else!', true);
+        await loadFromSupabase();
+        openTeamModal(partial); // refresh modal
+        return;
+      }
+      partial.team = t;
+      document.getElementById('team-modal').classList.remove('open');
+      finishLogin(partial);
+    };
+    grid.appendChild(btn);
+  });
+  document.getElementById('team-modal').classList.add('open');
+}
+
+function finishLogin(user) {
+  currentUser = user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  document.getElementById('u-avatar').textContent = user.avatar;
+  document.getElementById('u-name').textContent = user.name;
+  document.getElementById('u-team').textContent = user.team.emoji + ' ' + user.team.name;
+  renderChart();
+  renderVoteCards();
+  updateMatrix();
+}
+
+async function logout() {
+  if (currentUser?.team) {
+    await dbUnlockTeam(currentUser.team.id);
+  }
+  currentUser = null;
+  myVotedTeams = {};
+  TEAMS.forEach(t => myVotedTeams[t.id] = null);
+  stopFW();
+  stopSpotlight();
+  document.getElementById('champ-banner').classList.remove('show');
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('email-inp').value = '';
+}
+
+// ═══════════════════════════════════════════════════════
+// VOTE CARDS — sorted: unvoted first, voted-done last, own last
+// ═══════════════════════════════════════════════════════
+function renderVoteCards() {
+  const grid = document.getElementById('vote-grid');
+  grid.innerHTML = '';
+
+  const sorted = [...TEAMS].sort((a, b) => {
+    const aOwn   = currentUser?.team?.id === a.id;
+    const bOwn   = currentUser?.team?.id === b.id;
+    const aVoted = !!myVotedTeams[a.id]?.confirmed;
+    const bVoted = !!myVotedTeams[b.id]?.confirmed;
+    if (aOwn !== bOwn)   return aOwn  ? 1 : -1;
+    if (aVoted !== bVoted) return aVoted ? 1 : -1;
+    return a.id - b.id;
+  });
+
+  const ranked = getRanks();
+  sorted.forEach(t => {
+    const isOwn      = currentUser?.team?.id === t.id;
+    const isDone     = !!myVotedTeams[t.id]?.confirmed;
+    const rankIdx    = ranked.findIndex(r => r.id === t.id);
+    const rankEmoji  = votes[t.id] > 0 ? ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'][rankIdx] : '';
+    const myEntry    = myVotedTeams[t.id];
+
+    const card = document.createElement('div');
+    card.className = 'vote-card' + (isOwn?' is-own':'') + (isDone?' is-voted-done':'');
+    card.id = 'vcard-' + t.id;
+
+    card.innerHTML = `
+      <div class="tc-hdr">
+        <div class="tc-dot" style="background:${t.color}"></div>
+        <div class="tc-name" style="color:${t.color}">${t.emoji} ${t.name}</div>
+        <span class="tc-rank">${rankEmoji}</span>
+        ${isDone ? '<span class="badge-sm badge-voted">✓ voted</span>' : ''}
+        ${isOwn  ? '<span class="badge-sm badge-own">your team</span>' : ''}
+      </div>
+      ${isOwn ? '' : buildKeypadHTML(t, myEntry)}
+    `;
+    grid.appendChild(card);
+    if (!isOwn) attachKeypadEvents(t);
+  });
+}
+
+function buildKeypadHTML(t, myEntry) {
+  const confirmed = myEntry?.confirmed;
+  const savedPts  = myEntry?.pts || 0;
+
+  if (confirmed) {
+    return `
+      <div class="voted-panel" id="vpanel-${t.id}">
+        <span class="voted-lock-icon" id="lockicon-${t.id}" onclick="secretTap(${t.id})" title="">🔒</span>
+        <div class="voted-pts-label">You voted</div>
+        <div class="voted-pts-value">${savedPts.toLocaleString()}</div>
+        <div class="voted-pts-sub">points — vote locked</div>
+        <div class="secret-edit" id="sedit-${t.id}">
+          <div class="secret-hint">ADMIN EDIT MODE</div>
+          <div class="kp-wrap">
+            <input type="number" class="pts-inp" id="pinp-${t.id}"
+              min="0" max="5000" placeholder="new amount"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPoints(${t.id});}"
+              oninput="syncInp(${t.id})">
+            <div class="max-warn" id="mwarn-${t.id}"></div>
+            <div class="kp-grid" id="kpgrid-${t.id}">
+              ${[1,2,3,4,5,6,7,8,9,'C',0,'⌫'].map(k=>`
+                <button class="kp-btn ${k==='⌫'?'kp-del':''} ${k==='C'?'kp-clr':''}"
+                  onclick="kpPress(${t.id},'${k}')">${k}</button>
+              `).join('')}
+            </div>
+            <button class="btn-launch" id="lbtn-${t.id}" onclick="confirmPoints(${t.id})">
+              ✅ Confirm Points
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="kp-wrap" id="kp-${t.id}">
+      <input type="number" class="pts-inp" id="pinp-${t.id}"
+        min="0" max="5000" placeholder="type 0–5000, Enter to confirm"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPoints(${t.id});}"
+        oninput="syncInp(${t.id})">
+      <div class="max-warn" id="mwarn-${t.id}"></div>
+      <div class="kp-grid" id="kpgrid-${t.id}">
+        ${[1,2,3,4,5,6,7,8,9,'C',0,'⌫'].map(k=>`
+          <button class="kp-btn ${k==='⌫'?'kp-del':''} ${k==='C'?'kp-clr':''}"
+            onclick="kpPress(${t.id},'${k}')">${k}</button>
+        `).join('')}
+      </div>
+      <button class="btn-launch" id="lbtn-${t.id}" onclick="confirmPoints(${t.id})">
+        ✅ Confirm Points
+      </button>
+    </div>
+  `;
+}
+
+// Secret 5-tap handler on the lock icon
+const secretTaps = {};
+const secretTimers = {};
+function secretTap(tid) {
+  secretTaps[tid] = (secretTaps[tid] || 0) + 1;
+  clearTimeout(secretTimers[tid]);
+  secretTimers[tid] = setTimeout(() => { secretTaps[tid] = 0; }, 2000);
+  if (secretTaps[tid] >= 5) {
+    secretTaps[tid] = 0;
+    const panel = document.getElementById('sedit-' + tid);
+    if (panel) {
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) {
+        const inp = document.getElementById('pinp-' + tid);
+        if (inp) { inp.value = ''; inp.focus(); }
+      }
+    }
+  }
+}
+
+function attachKeypadEvents(t) { /* inline handlers used */ }
+
+function syncInp(tid) {
+  const inp = document.getElementById('pinp-' + tid);
+  const warn = document.getElementById('mwarn-' + tid);
+  if (!inp) return;
+  let v = parseInt(inp.value) || 0;
+  if (v > MAX_PTS) {
+    inp.value = MAX_PTS;
+    inp.classList.remove('over-limit');
+    void inp.offsetWidth; // reflow to restart animation
+    inp.classList.add('over-limit');
+    if (warn) { warn.textContent = '⚠️ Max is 5,000 pts'; warn.style.opacity='1'; }
+    setTimeout(() => { inp.classList.remove('over-limit'); if(warn){warn.style.opacity='0';} }, 1200);
+  } else {
+    if (warn) warn.textContent = '';
+  }
+  if (v < 0) inp.value = 0;
+}
+
+function kpPress(tid, key) {
+  const inp = document.getElementById('pinp-' + tid);
+  const warn = document.getElementById('mwarn-' + tid);
+  if (!inp || inp.disabled) return;
+  let cur = inp.value || '';
+  if (key==='C') { inp.value=''; if(warn) warn.textContent=''; return; }
+  if (key==='⌫') { inp.value=cur.slice(0,-1); if(warn) warn.textContent=''; return; }
+  if (cur.length>=4) return;
+  const next = cur + key;
+  const v = parseInt(next)||0;
+  if (v > MAX_PTS) {
+    inp.value = MAX_PTS;
+    inp.classList.remove('over-limit');
+    void inp.offsetWidth;
+    inp.classList.add('over-limit');
+    if (warn) { warn.textContent = '⚠️ Max is 5,000 pts'; warn.style.opacity='1'; }
+    setTimeout(() => { inp.classList.remove('over-limit'); if(warn){warn.style.opacity='0';} }, 1200);
+  } else {
+    inp.value = next;
+    if (warn) warn.textContent = '';
+  }
+}
+
+// Confirm points — locks vote; secret re-edit subtracts old pts first
+async function confirmPoints(tid) {
+  const inp  = document.getElementById('pinp-'+tid);
+  const pts  = parseInt(inp?.value)||0;
+  if (pts<=0)      { showToast('⚠️ Enter points > 0 first', true); return; }
+  if (pts>MAX_PTS) { showToast(`⚠️ Max ${MAX_PTS.toLocaleString()} pts`, true); return; }
+
+  // If re-editing an already-confirmed vote, subtract the old amount first
+  const wasConfirmed = myVotedTeams[tid]?.confirmed;
+  const oldPts = myVotedTeams[tid]?.pts || 0;
+  if (wasConfirmed && oldPts > 0 && !dbClient) {
+    votes[tid] = Math.max(0, (votes[tid]||0) - oldPts);
+  }
+
+  // Immediately collapse keypad UI
+  const kpWrap = document.getElementById('kp-'+tid) || document.getElementById('sedit-'+tid);
+  if (kpWrap) kpWrap.innerHTML = '<div style="text-align:center;padding:.5rem;color:var(--accent);font-family:Orbitron,monospace;font-size:.8rem;">🚀 Launching...</div>';
+
+  await launchVote(tid, pts);
+}
+
+async function launchVote(tid, pts) {
+  // Persist to DB
+  const ok = await dbSaveVote(tid, pts);
+  if (!ok) {
+    showToast('⚠️ Failed to save vote. Try again.', true);
+    editVote(tid);
+    return;
+  }
+
+  // Mark confirmed in local state
+  myVotedTeams[tid] = { pts, confirmed: true };
+
+  // Local totals (if not using Supabase realtime)
+  if (!dbClient) {
+    votes[tid] = (votes[tid]||0) + pts;
+    const tName = TEAMS.find(t=>t.id===tid)?.name||'';
+    voteLog.unshift({voter:currentUser?.name||'–', email:currentUser?.email||'–', from:currentUser?.team?.name||'–', to:tName, pts, time:new Date().toLocaleTimeString()});
+  }
+
+  // Find positions for rocket animation
+  const cardEl = document.getElementById('vcard-'+tid);
+  const barEl  = document.getElementById('barslot-'+tid);
+  let sx=innerWidth/2, sy=innerHeight*0.7, ex=innerWidth/2, ey=100;
+  if (cardEl){const r=cardEl.getBoundingClientRect();sx=r.left+r.width/2;sy=r.top+30;}
+  if (barEl) {const r=barEl.getBoundingClientRect(); ex=r.left+r.width/2;ey=r.top+r.height*0.2;}
+
+  const tColor = TEAMS.find(t=>t.id===tid)?.color||'#f59e0b';
+  const tName  = TEAMS.find(t=>t.id===tid)?.name||'';
+
+  animRocket(sx,sy,ex,ey,pts,tColor, ()=>{
+    renderChart();
+    renderVoteCards(); // voted card drops to bottom
+    updateMatrix();
+    checkChampion();
+    showToast(`🚀 ${pts.toLocaleString()} pts → ${tName}!`);
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════
+// ROCKET ANIMATION
+// ═══════════════════════════════════════════════════════
+function animRocket(x0,y0,x1,y1,pts,color,onDone){
+  const layer=document.getElementById('rocket-layer');
+  const rkt=document.createElement('div'); rkt.className='rocket-fly'; rkt.textContent='🚀'; layer.appendChild(rkt);
+  const pop=document.createElement('div'); pop.className='pts-pop'; pop.style.color=color; pop.textContent='+'+pts.toLocaleString(); layer.appendChild(pop);
+
+  const dur=950, t0=performance.now();
+  const arcY=Math.min(y0,y1)-Math.abs(x1-x0)*0.4-80;
+  const angle=(Math.atan2(y1-y0,x1-x0)*180/Math.PI-45)+'deg';
+
+  function frame(now){
+    const raw=Math.min((now-t0)/dur,1);
+    const p=raw<.5?2*raw*raw:1-Math.pow(-2*raw+2,2)/2;
+    const bx=(1-p)*(1-p)*x0+2*(1-p)*p*((x0+x1)/2)+p*p*x1;
+    const by=(1-p)*(1-p)*y0+2*(1-p)*p*arcY+p*p*y1;
+    rkt.style.cssText=`position:fixed;font-size:1.5rem;z-index:997;pointer-events:none;left:${bx-14}px;top:${by-14}px;opacity:${raw<.88?1:1-(raw-.88)/.12};transform:rotate(${angle});`;
+    const rp2=Math.max(raw-.07,0), p2=rp2<.5?2*rp2*rp2:1-Math.pow(-2*rp2+2,2)/2;
+    const px=(1-p2)*(1-p2)*x0+2*(1-p2)*p2*((x0+x1)/2)+p2*p2*x1;
+    const py=(1-p2)*(1-p2)*y0+2*(1-p2)*p2*arcY+p2*p2*y1;
+    pop.style.cssText=`position:fixed;font-family:'Orbitron',monospace;font-weight:900;font-size:1rem;z-index:996;pointer-events:none;color:${color};text-shadow:0 0 8px ${color};left:${px-30}px;top:${py-28}px;opacity:${raw<.65?1:1-(raw-.65)/.35};transform:scale(${1+(1-raw)*.5});`;
+    if(raw<1){requestAnimationFrame(frame);}
+    else{rkt.remove();pop.remove();miniBlast(x1,y1,color);onDone();}
+  }
+  requestAnimationFrame(frame);
+}
+
+function miniBlast(cx,cy,color){
+  const layer=document.getElementById('rocket-layer');
+  for(let i=0;i<14;i++){
+    const sp=document.createElement('div');
+    const a=(Math.PI*2/14)*i, dist=28+Math.random()*28;
+    const tx=cx+Math.cos(a)*dist, ty=cy+Math.sin(a)*dist;
+    sp.style.cssText=`position:fixed;width:5px;height:5px;border-radius:50%;background:${color};pointer-events:none;z-index:995;left:${cx}px;top:${cy}px;`;
+    layer.appendChild(sp); let prog=0;
+    (function anim(){prog=Math.min(prog+.065,1);sp.style.left=(cx+(tx-cx)*prog)+'px';sp.style.top=(cy+(ty-cy)*prog+prog*prog*18)+'px';sp.style.opacity=1-prog;if(prog<1)requestAnimationFrame(anim);else sp.remove();})();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// CHART — absolute-positioned bars that SLIDE smoothly on rank change
+// ═══════════════════════════════════════════════════════
+function getRanks(){return [...TEAMS].sort((a,b)=>(votes[b.id]||0)-(votes[a.id]||0));}
+
+function renderChart(){
+  const container = document.getElementById('chart-bars');
+  const ranked    = getRanks();
+  const n         = TEAMS.length;
+  const cW        = container.offsetWidth || 600;
+  const cH        = container.offsetHeight || 300;
+  const leftPad   = 0; // already handled by container padding
+  const gap       = 8;
+  const slotW     = Math.floor((cW - gap*(n-1)) / n);
+  const usableH   = cH - 40; // reserve space for labels below
+
+  const maxV = Math.max(...TEAMS.map(t=>votes[t.id]||0), 1);
+  const cMax = maxV * 1.15;
+
+  // Grid lines (redrawn)
+  const grid = document.getElementById('chart-grid');
+  grid.innerHTML = '';
+  [0,.25,.5,.75,1].forEach(f=>{
+    const val = Math.round(cMax*f);
+    const bot = f * usableH;
+    const gl  = document.createElement('div'); gl.className='g-line'; gl.style.bottom=bot+'px'; grid.appendChild(gl);
+    const ll  = document.createElement('div'); ll.className='g-lbl'; ll.style.bottom=(bot-5)+'px';
+    ll.textContent = val>=1000?(val/1000).toFixed(0)+'k':val; grid.appendChild(ll);
+  });
+
+  const medals = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'];
+
+  ranked.forEach((t, rankIdx) => {
+    const val    = votes[t.id] || 0;
+    const bH     = Math.max((val/cMax)*usableH, val>0?3:0);
+    const isChamp= rankIdx===0 && val>0;
+    const leftX  = rankIdx * (slotW + gap);
+
+    let slot = document.getElementById('barslot-'+t.id);
+    if (!slot) {
+      // Create new slot
+      slot = document.createElement('div');
+      slot.className = 'bar-slot';
+      slot.id = 'barslot-'+t.id;
+      slot.style.width  = slotW+'px';
+      slot.style.left   = leftX+'px';
+      slot.innerHTML = `
+        <div class="rank-medal" id="bmedal-${t.id}"></div>
+        <div class="bar-val" id="bval-${t.id}" style="color:${t.color}"></div>
+        <div class="bar-fill-wrap">
+          <div class="bar-fill" id="bfill-${t.id}"
+            style="background:linear-gradient(180deg,${t.color},${t.color}66);box-shadow:0 0 8px ${t.color}44;color:${t.color};height:0px;"></div>
+        </div>
+        <div class="bar-lbl" style="color:${t.color}">
+          <span class="bar-emoji">${t.emoji}</span>${t.name}
+        </div>
+      `;
+      container.appendChild(slot);
+    }
+
+    // Smoothly slide to new position and width
+    slot.style.left  = leftX+'px';
+    slot.style.width = slotW+'px';
+
+    // Update bar height
+    const fill = document.getElementById('bfill-'+t.id);
+    if (fill) {
+      fill.style.height = bH+'px';
+      fill.className = 'bar-fill' + (isChamp?' champ-bar':'');
+    }
+
+    // Update value label
+    const valEl = document.getElementById('bval-'+t.id);
+    if (valEl) valEl.textContent = val>0 ? val.toLocaleString() : '';
+
+    // Update medal
+    const medalEl = document.getElementById('bmedal-'+t.id);
+    if (medalEl) medalEl.textContent = val>0 ? medals[rankIdx] : '';
+  });
+
+  const total = TEAMS.reduce((s,t)=>s+(votes[t.id]||0),0);
+  document.getElementById('total-pts').textContent = total.toLocaleString();
+
+  if (ranked[0] && votes[ranked[0].id]>0) startSpotlight(ranked[0]);
+  else stopSpotlight();
+}
+
+// ═══════════════════════════════════════════════════════
+// SPOTLIGHT — angle light on #1 bar
+// ═══════════════════════════════════════════════════════
+const spC = document.getElementById('spotlight-canvas');
+const spX = spC.getContext('2d');
+let spRunning = false, spRaf = null, spAngle = 0;
+
+function resizeSP(){ spC.width=innerWidth; spC.height=innerHeight; }
+resizeSP();
+
+function startSpotlight(leaderTeam){
+  spRunning = true;
+  const color = leaderTeam.color;
+  function drawSpot(){
+    if(!spRunning){spX.clearRect(0,0,spC.width,spC.height);return;}
+    spX.clearRect(0,0,spC.width,spC.height);
+    const barEl = document.getElementById('barslot-'+leaderTeam.id);
+    if(!barEl){spRaf=requestAnimationFrame(drawSpot);return;}
+    const r = barEl.getBoundingClientRect();
+    const bx = r.left + r.width/2;
+    const by = r.top;
+
+    // Sweeping multi-beam spotlight from top
+    spAngle += 0.012;
+    const beams = 7;
+    for(let i=0;i<beams;i++){
+      const spread = 0.18;
+      const base = spAngle + (i/beams)*Math.PI*2;
+      const beamA = base % (Math.PI*2);
+      // Only draw beams pointing roughly downward toward bar
+      const tx = bx + Math.sin(beamA)*Math.max(spC.height, spC.width)*1.5;
+      const ty = by + Math.cos(beamA)*Math.max(spC.height, spC.width)*1.5;
+
+      const grad = spX.createConicalGradient
+        ? null  // fallback below
+        : null;
+
+      // Use radial gradient approximation for each beam
+      const angle1 = beamA - spread;
+      const angle2 = beamA + spread;
+      const len = Math.max(spC.width, spC.height) * 1.2;
+
+      spX.save();
+      spX.globalAlpha = 0.07 + Math.sin(spAngle*3+i)*0.02;
+      spX.beginPath();
+      spX.moveTo(bx, by);
+      spX.lineTo(bx + Math.cos(angle1)*len, by + Math.sin(angle1)*len);
+      spX.lineTo(bx + Math.cos(angle2)*len, by + Math.sin(angle2)*len);
+      spX.closePath();
+
+      const grd = spX.createLinearGradient(bx,by, bx+Math.cos(beamA)*len, by+Math.sin(beamA)*len);
+      grd.addColorStop(0, color+'cc');
+      grd.addColorStop(0.5, color+'44');
+      grd.addColorStop(1, color+'00');
+      spX.fillStyle = grd;
+      spX.fill();
+      spX.restore();
+    }
+
+    // Bright halo at bar top
+    const haloR = 50 + Math.sin(spAngle*4)*10;
+    const halo = spX.createRadialGradient(bx,by,0,bx,by,haloR);
+    halo.addColorStop(0,  color+'55');
+    halo.addColorStop(0.4,color+'22');
+    halo.addColorStop(1,  color+'00');
+    spX.save();
+    spX.globalAlpha=0.8;
+    spX.beginPath(); spX.arc(bx,by,haloR,0,Math.PI*2); spX.fillStyle=halo; spX.fill();
+    spX.restore();
+
+    spRaf = requestAnimationFrame(drawSpot);
+  }
+  if(spRaf) cancelAnimationFrame(spRaf);
+  drawSpot();
+}
+
+function stopSpotlight(){
+  spRunning=false;
+  if(spRaf) cancelAnimationFrame(spRaf);
+  spX.clearRect(0,0,spC.width,spC.height);
+}
+
+// ═══════════════════════════════════════════════════════
+// CHAMPION CHECK
+// ═══════════════════════════════════════════════════════
+function checkChampion(){
+  const top=getRanks()[0];
+  if(!top||votes[top.id]===0){document.getElementById('champ-banner').classList.remove('show');return;}
+  document.getElementById('champ-name').textContent=top.emoji+' '+top.name;
+  document.getElementById('champ-pts').textContent='Total Points: '+votes[top.id].toLocaleString()+' pts';
+  document.getElementById('champ-banner').classList.add('show');
+  launchFW(top.color);
+}
+
+// ═══════════════════════════════════════════════════════
+// VOTE MATRIX — rows = voters (team + email), columns = Team 1-6
+// ═══════════════════════════════════════════════════════
+function updateMatrix() {
+  const wrap = document.getElementById('matrix-wrap');
+  const thead = document.getElementById('matrix-thead');
+  const tbody = document.getElementById('matrix-body');
+  if (!voteLog.length && !Object.values(takenTeams).length) { wrap.style.display='none'; return; }
+  wrap.style.display = '';
+
+  // Build header row: Voter | Team 1 | Team 2 | ... | Team 6
+  thead.innerHTML = `<tr>
+    <th class="row-hdr">Voter</th>
+    ${TEAMS.map(t=>`<th><span style="color:${t.color}">${t.emoji}</span><br>${t.name}</th>`).join('')}
+  </tr>`;
+
+  // Build one row per team (voter = the team representative)
+  // Group votes by from_team
+  const votesByTeam = {}; // teamName -> { toTeamId -> true }
+  voteLog.forEach(v => {
+    if (!votesByTeam[v.from]) votesByTeam[v.from] = {};
+    const toTeam = TEAMS.find(t=>t.name===v.to);
+    if (toTeam) votesByTeam[v.from][toTeam.id] = true;
+  });
+
+  // Count how many teams have voted at all
+  const voterTeams = Object.keys(votesByTeam);
+  const totalVoters = TEAMS.length - 1; // each team votes for 5 others conceptually
+  document.getElementById('matrix-sub').textContent =
+    voterTeams.length + ' team(s) have voted';
+
+  tbody.innerHTML = TEAMS.map(t => {
+    const email = Object.keys(takenTeams).length
+      ? (Object.entries(takenTeams).find(([k])=>parseInt(k)===t.id)?.[1] || '—')
+      : '—';
+    const voted = votesByTeam[t.name] || {};
+    const cells = TEAMS.map(target => {
+      if (target.id === t.id) {
+        return `<td class="tick-cell own-cell" title="Own team">—</td>`;
+      }
+      const has = !!voted[target.id];
+      return `<td class="tick-cell">
+        <span class="${has?'tick-yes':'tick-no'}">${has?'✓':'·'}</span>
+      </td>`;
+    }).join('');
+
+    return `<tr>
+      <td class="voter-cell">
+        <div class="voter-name" style="color:${t.color}">${t.emoji} ${t.name}</div>
+        <span class="voter-email">${email}</span>
+        <span class="voter-team-badge" style="color:${t.color};border-color:${t.color}44;background:${t.color}11;">${t.name}</span>
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════
+let toastTmr;
+function showToast(msg,err=false){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast show'+(err?' error':'');
+  clearTimeout(toastTmr); toastTmr=setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════════════════════
+// FIREWORKS — 50% faster, auto-stop after FW_DURATION_MS
+// ═══════════════════════════════════════════════════════
+const fwC=document.getElementById('fw-canvas'), fwX=fwC.getContext('2d');
+let fwP=[],fwOn=false,fwInt=null,fwStopTimer=null;
+
+function resizeFW(){fwC.width=innerWidth;fwC.height=innerHeight;}
+window.addEventListener('resize',()=>{resizeFW();resizeSP();if(currentUser)renderChart();});
+resizeFW();
+
+function mkFW(x,y,color){
+  const n=45+Math.random()*25;
+  for(let i=0;i<n;i++){
+    const a=(Math.PI*2/n)*i+Math.random()*.3, s=2+Math.random()*5;
+    fwP.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,
+      alpha:1,color:color||`hsl(${Math.random()*360},88%,62%)`,
+      size:1.8+Math.random()*2.2,
+      grav:0.13,        // 2× original gravity = falls 2× faster
+      decay:0.028+Math.random()*0.018  // 2× original decay = fades 2× faster
+    });
+  }
+}
+
+function animFW(){
+  if(!fwOn)return;
+  fwX.clearRect(0,0,fwC.width,fwC.height);
+  for(let i=fwP.length-1;i>=0;i--){
+    const p=fwP[i];
+    fwX.beginPath();fwX.arc(p.x,p.y,p.size,0,Math.PI*2);
+    fwX.fillStyle=p.color;fwX.globalAlpha=p.alpha;fwX.fill();fwX.globalAlpha=1;
+    p.x+=p.vx;p.y+=p.vy;p.vy+=p.grav;p.vx*=.985;p.alpha-=p.decay;
+    if(p.alpha<=0)fwP.splice(i,1);
+  }
+  requestAnimationFrame(animFW);
+}
+
+function launchFW(color){
+  // Clear any previous auto-stop timer
+  if(fwStopTimer) clearTimeout(fwStopTimer);
+  if(fwInt) clearInterval(fwInt);
+  fwOn=true; animFW();
+
+  let c=0;
+  (function burst(){
+    if(c>=12)return; // fewer bursts (was 16)
+    mkFW(Math.random()*fwC.width,Math.random()*fwC.height*.55,c%3===0?color:null);
+    mkFW(Math.random()*fwC.width,Math.random()*fwC.height*.5,'#ffd700');
+    c++; setTimeout(burst,180+Math.random()*220); // faster interval (was 260-360)
+  })();
+
+  // Continuous bursts while running
+  fwInt = setInterval(()=>{
+    if(fwP.length<40) mkFW(Math.random()*fwC.width,Math.random()*fwC.height*.5,color);
+  },1800); // faster (was 2600)
+
+  // AUTO STOP after FW_DURATION_MS
+  fwStopTimer = setTimeout(stopFW, FW_DURATION_MS);
+}
+
+function stopFW(){
+  fwOn=false;
+  if(fwInt) clearInterval(fwInt);
+  if(fwStopTimer) clearTimeout(fwStopTimer);
+  fwP=[];
+  fwX.clearRect(0,0,fwC.width,fwC.height);
+}
+
+// ═══════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════
+initSupabase();
+</script>
+</body>
+</html>
