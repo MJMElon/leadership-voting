@@ -204,6 +204,14 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .tick-no{color:#64748b;font-size:.7rem;}
 .own-cell{color:#64748b;font-size:.85rem;}
 
+/* bonus row */
+.bonus-row td{background:linear-gradient(135deg,rgba(255,215,0,.05),transparent);border-bottom:1px solid #2d3748;}
+.bonus-cell{padding:.4rem .35rem !important;}
+.bonus-input{width:62px;background:var(--surface2);border:1px solid #2d3748;border-radius:.4rem;color:var(--gold);font-family:'Orbitron',monospace;font-weight:700;font-size:.85rem;padding:.32rem .35rem;text-align:center;outline:none;transition:border-color .15s,box-shadow .15s;}
+.bonus-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,215,0,.18);}
+.bonus-input::-webkit-inner-spin-button,.bonus-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.bonus-input{-moz-appearance:textfield;}
+
 /* smooth bar slot transitions using CSS left positioning */
 #chart-bars{position:relative;}
 .bar-slot{position:absolute;bottom:0;top:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.3rem;transition:left .7s cubic-bezier(.4,0,.2,1),width .7s cubic-bezier(.4,0,.2,1);}
@@ -329,11 +337,15 @@ const FW_DURATION_MS = 8000; // fireworks auto-stop after 8s
 // STATE
 // ═══════════════════════════════════════════════════════
 let currentUser   = null;
-let votes         = {};   // teamId -> total points
+let votes         = {};   // teamId -> total points (votes + bonus combined)
 let voteLog       = [];
 let myVotedTeams  = {};   // teamId -> {pts, confirmed}  (this session's votes)
 let takenTeams    = {};   // teamId -> email (locked slots)
+let bonusMarks    = {};   // teamId -> bonus points (latest only)
 let dbClient      = null;
+
+const BONUS_MARKER = '__BONUS__'; // sentinel value stored in votes.from_team for bonus rows
+const BONUS_EMAIL  = 'bonus@dashboard';
 
 TEAMS.forEach(t => { votes[t.id] = 0; myVotedTeams[t.id] = null; });
 
@@ -358,45 +370,93 @@ async function loadFromSupabase() {
   const {data: sessions} = await dbClient.from('sessions').select('*');
   takenTeams = {};
   (sessions||[]).forEach(s => takenTeams[s.team_id] = s.email);
-  // Load votes
+  // Load votes (and bonus rows, which live in the same table behind a marker)
   const {data: vrows} = await dbClient.from('votes').select('*').order('created_at',{ascending:false});
   votes = {};
   TEAMS.forEach(t => votes[t.id] = 0);
   voteLog = [];
+  bonusMarks = {};
   (vrows||[]).forEach(v => {
+    if (v.from_team === BONUS_MARKER) {
+      // Only the most recent bonus per team counts (rows are DESC)
+      if (bonusMarks[v.to_team_id] == null) {
+        bonusMarks[v.to_team_id] = v.points;
+        votes[v.to_team_id] = (votes[v.to_team_id]||0) + v.points;
+      }
+      return;
+    }
     votes[v.to_team_id] = (votes[v.to_team_id]||0) + v.points;
-    voteLog.push({voter:v.voter_name, email:v.voter_email, from:v.from_team, to:TEAMS.find(t=>t.id===v.to_team_id)?.name||v.to_team_id, pts:v.points, time:new Date(v.created_at).toLocaleTimeString()});
+    voteLog.push({id:v.id, voter:v.voter_name, email:v.voter_email, from:v.from_team, to:TEAMS.find(t=>t.id===v.to_team_id)?.name||v.to_team_id, pts:v.points, time:new Date(v.created_at).toLocaleTimeString()});
   });
+}
+
+// Who "owns" a team — the active session holder OR the first email that ever voted from it
+function getTeamOwnerEmail(teamId) {
+  if (takenTeams[teamId]) return takenTeams[teamId];
+  const team = TEAMS.find(t => t.id === teamId);
+  if (!team) return null;
+  // voteLog is DESC by created_at, so the LAST element from this team is the earliest voter
+  const fromTeam = voteLog.filter(v => v.from === team.name);
+  if (fromTeam.length) return fromTeam[fromTeam.length - 1].email;
+  return null;
 }
 
 const ourVoteIds = new Set();
 
 function subscribeRealtime() {
   if (!dbClient) return;
-  dbClient.channel('votes-rt').on('postgres_changes',{event:'INSERT',schema:'public',table:'votes'}, payload => {
-    const v = payload.new;
-    if (ourVoteIds.has(v.id)) return; // we already added this locally
-    // Also dedupe by content in case realtime fires before our save resolves
-    const dupe = voteLog.some(l => l.email === v.voter_email && l.pts === v.points && TEAMS.find(t=>t.name===l.to)?.id === v.to_team_id);
-    if (dupe) { ourVoteIds.add(v.id); return; }
-    votes[v.to_team_id] = (votes[v.to_team_id]||0) + v.points;
-    const tName = TEAMS.find(t=>t.id===v.to_team_id)?.name||'';
-    voteLog.unshift({voter:v.voter_name, email:v.voter_email, from:v.from_team, to:tName, pts:v.points, time:new Date(v.created_at).toLocaleTimeString()});
-    if (currentUser) { renderChart(); renderVoteCards(); updateMatrix(); checkChampion(); }
-  }).on('postgres_changes',{event:'INSERT',schema:'public',table:'sessions'}, payload => {
-    takenTeams[payload.new.team_id] = payload.new.email;
-    if (currentUser) renderVoteCards();
-  }).subscribe();
+  dbClient.channel('votes-rt')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'votes'}, payload => {
+      const v = payload.new;
+      if (ourVoteIds.has(v.id)) return; // we already added this locally
+      if (v.from_team === BONUS_MARKER) {
+        // Bonus update — replace any existing bonus for this team
+        const oldBonus = bonusMarks[v.to_team_id] || 0;
+        votes[v.to_team_id] = Math.max(0, (votes[v.to_team_id]||0) - oldBonus + v.points);
+        bonusMarks[v.to_team_id] = v.points;
+      } else {
+        // Dedupe by content in case realtime fires before our save resolves
+        const dupe = voteLog.some(l => l.email === v.voter_email && l.pts === v.points && TEAMS.find(t=>t.name===l.to)?.id === v.to_team_id);
+        if (dupe) { ourVoteIds.add(v.id); return; }
+        votes[v.to_team_id] = (votes[v.to_team_id]||0) + v.points;
+        const tName = TEAMS.find(t=>t.id===v.to_team_id)?.name||'';
+        voteLog.unshift({id:v.id, voter:v.voter_name, email:v.voter_email, from:v.from_team, to:tName, pts:v.points, time:new Date(v.created_at).toLocaleTimeString()});
+      }
+      if (currentUser) { renderChart(); renderVoteCards(); updateMatrix(); checkChampion(); }
+    })
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'votes'}, payload => {
+      // payload.old usually contains only the primary key unless the table has REPLICA IDENTITY FULL
+      const v = payload.old;
+      if (!v || v.id == null) return;
+      const idx = voteLog.findIndex(l => l.id === v.id);
+      if (idx === -1) return;
+      const entry = voteLog[idx];
+      const target = TEAMS.find(t => t.name === entry.to);
+      if (target) votes[target.id] = Math.max(0, (votes[target.id]||0) - entry.pts);
+      voteLog.splice(idx, 1);
+      if (currentUser) { renderChart(); renderVoteCards(); updateMatrix(); checkChampion(); }
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'sessions'}, payload => {
+      takenTeams[payload.new.team_id] = payload.new.email;
+      if (currentUser) renderVoteCards();
+    })
+    .subscribe();
 }
 
 async function dbLockTeam(teamId, email, name) {
+  // Reject if any other email has already claimed/voted from this team
+  const owner = getTeamOwnerEmail(teamId);
+  if (owner && owner !== email) return false;
   if (!dbClient) { takenTeams[teamId] = email; return true; }
-  // Check if already taken (race condition guard)
+  // Race-condition guard against another session claiming concurrently
   const {data} = await dbClient.from('sessions').select('email').eq('team_id', teamId).single();
-  if (data) return false; // already taken
-  const {error} = await dbClient.from('sessions').insert({team_id:teamId, email, name});
-  if (!error) takenTeams[teamId] = email;
-  return !error;
+  if (data && data.email !== email) return false;
+  if (!data) {
+    const {error} = await dbClient.from('sessions').insert({team_id:teamId, email, name});
+    if (error) return false;
+  }
+  takenTeams[teamId] = email;
+  return true;
 }
 
 async function dbSaveVote(toTeamId, pts) {
@@ -416,6 +476,43 @@ async function dbUnlockTeam(teamId) {
   if (!dbClient) { delete takenTeams[teamId]; return; }
   await dbClient.from('sessions').delete().eq('team_id', teamId);
   delete takenTeams[teamId];
+}
+
+async function saveBonus(teamId) {
+  const input = document.getElementById('bonus-' + teamId);
+  if (!input) return;
+  let pts = parseInt(input.value);
+  if (isNaN(pts) || pts < 0) pts = 0;
+  if (pts > 9999) pts = 9999;
+  input.value = pts;
+
+  const oldBonus = bonusMarks[teamId] || 0;
+  if (pts === oldBonus) return;
+
+  // Update local totals immediately
+  votes[teamId] = Math.max(0, (votes[teamId]||0) - oldBonus + pts);
+  bonusMarks[teamId] = pts;
+  renderChart();
+  checkChampion();
+
+  // Replace the bonus row for this team in the DB. Always insert (even pts=0)
+  // so the INSERT event propagates the new value to every other browser.
+  if (dbClient) {
+    await dbClient.from('votes')
+      .delete()
+      .eq('from_team', BONUS_MARKER)
+      .eq('to_team_id', teamId);
+    const {data} = await dbClient.from('votes').insert({
+      voter_email: BONUS_EMAIL,
+      voter_name:  'Bonus',
+      from_team:   BONUS_MARKER,
+      to_team_id:  teamId,
+      points:      pts
+    }).select().single();
+    if (data?.id) ourVoteIds.add(data.id);
+  }
+  const tName = TEAMS.find(t=>t.id===teamId)?.name || '';
+  showToast(`✨ ${tName} bonus: ${pts.toLocaleString()} pts`);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -479,7 +576,8 @@ function openTeamModal(partial) {
   const grid = document.getElementById('team-grid');
   grid.innerHTML = '';
   TEAMS.forEach(t => {
-    const taken = !!takenTeams[t.id];
+    const owner = getTeamOwnerEmail(t.id);
+    const taken = !!owner && owner !== partial.email;
     const btn = document.createElement('button');
     btn.className = 'team-pick-btn';
     btn.disabled = taken;
@@ -490,7 +588,7 @@ function openTeamModal(partial) {
       btn.textContent = '⏳ Claiming...';
       const ok = await dbLockTeam(t.id, partial.email, partial.name);
       if (!ok) {
-        showToast('⚠️ Team just taken by someone else!', true);
+        showToast('⚠️ Team already claimed by another email.', true);
         await loadFromSupabase();
         openTeamModal(partial); // refresh modal
         return;
@@ -736,6 +834,21 @@ async function confirmPoints(tid) {
 }
 
 async function launchVote(tid, pts) {
+  // If amending an existing confirmed vote, clear the previous row(s) first
+  // so the DB stays in sync with the new amount.
+  const isAmend = !!myVotedTeams[tid]?.confirmed;
+  if (isAmend) {
+    if (dbClient) {
+      await dbClient.from('votes')
+        .delete()
+        .eq('voter_email', currentUser.email)
+        .eq('to_team_id', tid)
+        .neq('from_team', BONUS_MARKER);
+    }
+    const tNameOld = TEAMS.find(t=>t.id===tid)?.name;
+    voteLog = voteLog.filter(v => !(v.email === currentUser.email && v.to === tNameOld));
+  }
+
   // Persist to DB
   const {ok, id} = await dbSaveVote(tid, pts);
   if (!ok) {
@@ -751,7 +864,7 @@ async function launchVote(tid, pts) {
   // Update local totals immediately (don't wait for realtime — it may be off or slow)
   votes[tid] = (votes[tid]||0) + pts;
   const tName = TEAMS.find(t=>t.id===tid)?.name||'';
-  voteLog.unshift({voter:currentUser?.name||'–', email:currentUser?.email||'–', from:currentUser?.team?.name||'–', to:tName, pts, time:new Date().toLocaleTimeString()});
+  voteLog.unshift({id, voter:currentUser?.name||'–', email:currentUser?.email||'–', from:currentUser?.team?.name||'–', to:tName, pts, time:new Date().toLocaleTimeString()});
 
   // Find positions for rocket animation
   const cardEl = document.getElementById('vcard-'+tid);
@@ -966,8 +1079,8 @@ function updateMatrix() {
   const wrap = document.getElementById('matrix-wrap');
   const thead = document.getElementById('matrix-thead');
   const tbody = document.getElementById('matrix-body');
-  if (!voteLog.length && !Object.values(takenTeams).length) { wrap.style.display='none'; return; }
-  wrap.style.display = '';
+  // Always show the wrap so the bonus row is editable even before any votes are in
+  wrap.style.display = currentUser ? '' : 'none';
 
   // Build header row: Voter | Team 1 | Team 2 | ... | Team 6
   thead.innerHTML = `<tr>
@@ -990,7 +1103,22 @@ function updateMatrix() {
   document.getElementById('matrix-sub').textContent =
     voterTeams.length + ' team(s) have voted';
 
-  tbody.innerHTML = TEAMS.map(t => {
+  // Bonus row — editable by any logged-in user, adds to the team's chart total
+  const bonusRow = `<tr class="bonus-row">
+    <td class="voter-cell">
+      <div class="voter-name" style="color:var(--gold)">✨ BONUS MARKS</div>
+      <span class="voter-email">Editable by anyone — added to the chart</span>
+    </td>
+    ${TEAMS.map(t => `
+      <td class="bonus-cell">
+        <input class="bonus-input" id="bonus-${t.id}" type="number" min="0" max="9999"
+          value="${bonusMarks[t.id]||0}"
+          onchange="saveBonus(${t.id})"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();event.target.blur();}">
+      </td>`).join('')}
+  </tr>`;
+
+  tbody.innerHTML = bonusRow + TEAMS.map(t => {
     // Email is whoever currently holds the slot, or whoever previously voted from this team
     let email = takenTeams[t.id];
     if (!email) {
