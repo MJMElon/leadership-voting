@@ -193,7 +193,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 /* blink-over animation for over-limit input */
 @keyframes blinkRed{0%,100%{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(239,68,68,.3)}50%{border-color:#ff9999;box-shadow:0 0 0 6px rgba(239,68,68,.1)}}
 .pts-inp.over-limit{animation:blinkRed .25s ease-in-out 4;border-color:var(--accent2);}
-.max-warn{font-size:.65rem;color:var(--accent2);text-align:center;font-family:'Rajdhani',sans-serif;letter-spacing:.05em;min-height:.9rem;transition:opacity .3s;}
+.max-warn{font-size:.82rem;font-weight:700;color:var(--accent2);text-align:center;font-family:'Rajdhani',sans-serif;letter-spacing:.05em;min-height:1.1rem;transition:opacity .25s;text-shadow:0 0 8px rgba(239,68,68,.45);}
 
 /* VOTE MATRIX TABLE */
 .matrix-wrap{max-width:960px;margin:1.5rem auto 0;background:var(--surface);border:1px solid #2d3748;border-radius:.95rem;overflow:hidden;}
@@ -973,6 +973,18 @@ function secretTap(tid) {
 
 function attachKeypadEvents(t) { /* inline handlers used */ }
 
+function flashOverLimit(inp, warn) {
+  inp.classList.remove('over-limit');
+  void inp.offsetWidth; // reflow to restart animation
+  inp.classList.add('over-limit');
+  if (warn) { warn.textContent = '⚠️ Max is 5,000 pts'; warn.style.opacity='1'; }
+  clearTimeout(inp._warnTimer);
+  inp._warnTimer = setTimeout(() => {
+    inp.classList.remove('over-limit');
+    if (warn) warn.style.opacity = '0';
+  }, 3200);
+}
+
 function syncInp(tid) {
   const inp = document.getElementById('pinp-' + tid);
   const warn = document.getElementById('mwarn-' + tid);
@@ -980,15 +992,12 @@ function syncInp(tid) {
   let v = parseInt(inp.value) || 0;
   if (v > MAX_PTS) {
     inp.value = MAX_PTS;
-    inp.classList.remove('over-limit');
-    void inp.offsetWidth; // reflow to restart animation
-    inp.classList.add('over-limit');
-    if (warn) { warn.textContent = '⚠️ Max is 5,000 pts'; warn.style.opacity='1'; }
-    setTimeout(() => { inp.classList.remove('over-limit'); if(warn){warn.style.opacity='0';} }, 1200);
-  } else {
-    if (warn) warn.textContent = '';
+    flashOverLimit(inp, warn);
+  } else if (v < 0) {
+    inp.value = 0;
+  } else if (warn) {
+    warn.textContent = '';
   }
-  if (v < 0) inp.value = 0;
 }
 
 function kpPress(tid, key) {
@@ -998,16 +1007,19 @@ function kpPress(tid, key) {
   let cur = inp.value || '';
   if (key==='C') { inp.value=''; if(warn) warn.textContent=''; return; }
   if (key==='⌫') { inp.value=cur.slice(0,-1); if(warn) warn.textContent=''; return; }
-  if (cur.length>=4) return;
+  // If we're already at the 4-digit ceiling, any extra digit means
+  // they're trying to go over 5,000 — flash the warning, don't silently
+  // swallow the press.
+  if (cur.length >= 4) {
+    inp.value = String(MAX_PTS);
+    flashOverLimit(inp, warn);
+    return;
+  }
   const next = cur + key;
-  const v = parseInt(next)||0;
+  const v = parseInt(next) || 0;
   if (v > MAX_PTS) {
-    inp.value = MAX_PTS;
-    inp.classList.remove('over-limit');
-    void inp.offsetWidth;
-    inp.classList.add('over-limit');
-    if (warn) { warn.textContent = '⚠️ Max is 5,000 pts'; warn.style.opacity='1'; }
-    setTimeout(() => { inp.classList.remove('over-limit'); if(warn){warn.style.opacity='0';} }, 1200);
+    inp.value = String(MAX_PTS);
+    flashOverLimit(inp, warn);
   } else {
     inp.value = next;
     if (warn) warn.textContent = '';
