@@ -1260,6 +1260,38 @@ function miniBlast(cx,cy,color){
 // ═══════════════════════════════════════════════════════
 function getRanks(){return [...TEAMS].sort((a,b)=>(votes[b.id]||0)-(votes[a.id]||0));}
 
+// Round target up to a "nice" axis max with a tick step that's
+// 1/2/2.5/5 × 10^n. Aims for ~5 intervals so labels are sparse but readable.
+function niceScale(target) {
+  if (!isFinite(target) || target <= 0) return { cMax: 1, step: 1, ticks: 1 };
+  let step = 1;
+  for (let mag = 1; mag <= 1e12; mag *= 10) {
+    if (target / (1   * mag) <= 5) { step = 1   * mag; break; }
+    if (target / (2   * mag) <= 5) { step = 2   * mag; break; }
+    if (target / (2.5 * mag) <= 5) { step = 2.5 * mag; break; }
+    if (target / (5   * mag) <= 5) { step = 5   * mag; break; }
+  }
+  const cMax  = Math.ceil(target / step) * step;
+  const ticks = Math.round(cMax / step);
+  return { cMax, step, ticks };
+}
+
+// Format an axis value: 0 → "0", 1500 → "1.5k", 12500 → "12.5k", 1_000_000 → "1M"
+function fmtAxisLabel(v) {
+  if (v === 0) return '0';
+  if (v >= 1_000_000) {
+    const m = v / 1_000_000;
+    return (Number.isInteger(m) ? m : m.toFixed(2).replace(/\.?0+$/, '')) + 'M';
+  }
+  if (v >= 1000) {
+    const k = v / 1000;
+    if (Number.isInteger(k))       return k + 'k';
+    if (Number.isInteger(k * 10))  return k.toFixed(1) + 'k';
+    return k.toFixed(2).replace(/\.?0+$/, '') + 'k';
+  }
+  return String(v);
+}
+
 function renderChart(){
   const container = document.getElementById('chart-bars');
   const ranked    = getRanks();
@@ -1276,18 +1308,22 @@ function renderChart(){
   const gridH        = cH - topPad - bottomReserve;
   const usableH      = gridH - 36; // reserve room above bar for medal + value
   const maxV = Math.max(...TEAMS.map(t=>votes[t.id]||0), 1);
-  const cMax = maxV * 1.15;
+  // Pick a "nice" axis maximum and tick step (multiples of 1/2/2.5/5 × 10^n)
+  // so the y-axis labels are round numbers and line up with the bar tops.
+  const scale = niceScale(maxV * 1.1);
+  const cMax = scale.cMax;
 
   // Grid lines + y-axis labels (positioned inside the grid box defined in CSS)
   const grid = document.getElementById('chart-grid');
   grid.innerHTML = '';
-  [0,.25,.5,.75,1].forEach(f=>{
-    const val = Math.round(cMax*f);
+  for (let i = 0; i <= scale.ticks; i++) {
+    const f   = i / scale.ticks;
+    const val = Math.round(cMax * f);
     const bot = f * usableH;
     const gl  = document.createElement('div'); gl.className='g-line'; gl.style.bottom=bot+'px'; grid.appendChild(gl);
     const ll  = document.createElement('div'); ll.className='g-lbl'; ll.style.bottom=(bot-5)+'px';
-    ll.textContent = val>=1000?(val/1000).toFixed(0)+'k':val; grid.appendChild(ll);
-  });
+    ll.textContent = fmtAxisLabel(val); grid.appendChild(ll);
+  }
 
   const medals = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'];
 
