@@ -129,9 +129,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .rank-hint{font-size:.72rem;color:var(--muted);font-style:italic;}
 
 .chart-bars{height:320px;padding:0;position:relative;}
-.chart-grid{position:absolute;left:56px;right:10px;top:20px;bottom:30px;pointer-events:none;}
-.g-line{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.06);}
-.g-lbl{position:absolute;left:-50px;width:42px;text-align:right;font-size:.62rem;color:var(--muted);transform:translateY(50%);font-family:'Orbitron',monospace;}
+.chart-grid{position:absolute;left:12px;right:10px;top:20px;bottom:30px;pointer-events:none;}
+.g-line{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.05);}
 
 /* OLD flex bar-slot removed — now uses absolute positioned bars via JS */
 .bar-val{font-family:'Orbitron',monospace;font-size:clamp(.6rem,1.3vw,.82rem);font-weight:700;text-align:center;min-height:.9em;transition:color .3s;}
@@ -1299,7 +1298,7 @@ function renderChart(){
   const cW        = container.offsetWidth || 600;
   const cH        = container.offsetHeight || 320;
   // Layout — match the chart-grid offsets in CSS so bars and grid align
-  const leftGutter   = 56;
+  const leftGutter   = 12;
   const rightPad     = 10;
   const topPad       = 20;
   const bottomReserve = 30; // room for the team-name label below bars
@@ -1308,22 +1307,19 @@ function renderChart(){
   const gridH        = cH - topPad - bottomReserve;
   const usableH      = gridH - 36; // reserve room above bar for medal + value
   const maxV = Math.max(...TEAMS.map(t=>votes[t.id]||0), 1);
-  // Pick a "nice" axis maximum and tick step (multiples of 1/2/2.5/5 × 10^n)
-  // so the y-axis labels are round numbers and line up with the bar tops.
-  const scale = niceScale(maxV * 1.1);
-  const cMax = scale.cMax;
+  // Cap the chart a bit above the leader so the tallest bar doesn't crowd
+  // the top edge. No y-axis labels — the bar values are printed on each bar.
+  const cMax = maxV * 1.15;
 
-  // Grid lines + y-axis labels (positioned inside the grid box defined in CSS)
+  // Just a few subtle horizontal guide lines, no numeric labels.
   const grid = document.getElementById('chart-grid');
   grid.innerHTML = '';
-  for (let i = 0; i <= scale.ticks; i++) {
-    const f   = i / scale.ticks;
-    const val = Math.round(cMax * f);
-    const bot = f * usableH;
-    const gl  = document.createElement('div'); gl.className='g-line'; gl.style.bottom=bot+'px'; grid.appendChild(gl);
-    const ll  = document.createElement('div'); ll.className='g-lbl'; ll.style.bottom=(bot-5)+'px';
-    ll.textContent = fmtAxisLabel(val); grid.appendChild(ll);
-  }
+  [0.25, 0.5, 0.75].forEach(f => {
+    const gl = document.createElement('div');
+    gl.className = 'g-line';
+    gl.style.bottom = (f * usableH) + 'px';
+    grid.appendChild(gl);
+  });
 
   const medals = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'];
 
