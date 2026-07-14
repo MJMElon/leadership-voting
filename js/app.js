@@ -1,22 +1,20 @@
 (function (LV) {
   function rerenderRemote() {
     if (!LV.currentUser) return;
-    LV.renderChart();
-    LV.checkChampion();
+    LV.updateInteractiveVotingStatus();
     LV.refreshAssignmentModal();
     if (!LV.isUserEditing()) {
       LV.renderVotingUI();
-      LV.updateMatrix();
     }
   }
 
   LV.setRemoteUpdateHandler(rerenderRemote);
 
   window.proceedEmail = function () { LV.proceedEmail(); };
-  window.enterAsViewer = function () { LV.enterAsViewer(); };
+  window.startInteractiveVoting = function () { LV.startInteractiveVoting(); };
   window.logout = function () { LV.logout(); };
   window.closeConfirmDialog = function () { LV.closeConfirmDialog(); };
-  window.confirmTeamVote = function () { LV.confirmTeamVote(); };
+  window.confirmVote = function () { LV.confirmVote(); };
   window.closeAssignmentModal = function () { LV.closeAssignmentModal(); };
   window.openWinnerAnnouncement = function () { LV.openWinnerAnnouncement(); };
   window.closeWinnerAnnouncement = function () { LV.closeWinnerAnnouncement(); };

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/interactive.css">
 </head>
 <body>
 
@@ -32,38 +33,34 @@
         <path fill="#4A90D9" d="M19.834 21c2.195-2.048 3.62-5.096 3.62-9 0-.71-.109-1.473-.272-2.182H12v4.637h6.436c-.317 1.559-1.17 2.766-2.395 3.558L19.834 21Z"/>
         <path fill="#FBBC05" d="M5.277 14.268A7.12 7.12 0 0 1 4.909 12c0-.782.125-1.533.357-2.235L1.24 6.65A11.934 11.934 0 0 0 0 12c0 1.92.445 3.73 1.237 5.335l4.04-3.067Z"/>
       </svg>
-      <span>Enter your Gmail address to continue</span>
+      <span>Enter your email address to continue</span>
     </div>
-    <label class="field-lbl" for="email-inp">Gmail Address</label>
-    <input type="email" class="email-inp" id="email-inp" placeholder="yourname@gmail.com" autocomplete="email"
+    <label class="field-lbl" for="email-inp">Email Address</label>
+    <input type="text" class="email-inp" id="email-inp" placeholder="yourname@gmail.com" autocomplete="email"
       onkeydown="if(event.key==='Enter')proceedEmail()">
     <button class="btn btn-cta" style="margin-top:.8rem" onclick="proceedEmail()">Continue →</button>
-    <button class="btn btn-viewer" style="margin-top:.6rem" onclick="enterAsViewer()">👁️ Viewer — watch live standings</button>
   </div>
 </div>
 
-<!-- Assignment picker -->
+<!-- Assignment picker (email users — teams only) -->
 <div class="modal-ov" id="assignment-modal">
   <div class="modal-box">
-    <h3>🏅 Select Your Assignment</h3>
-    <p>Choose exactly one team or role. Each slot can only be taken once.</p>
-    <div class="slot-section-title">Team</div>
+    <h3>🏅 Select Your Team</h3>
+    <p>Choose exactly one team. Each slot can only be taken once.</p>
     <div class="slot-grid" id="team-slot-grid"></div>
-    <div class="slot-section-title">Role</div>
-    <div class="slot-grid" id="role-slot-grid"></div>
     <button class="btn btn-secondary" style="width:100%;margin-top:.6rem" onclick="closeAssignmentModal()">Cancel</button>
   </div>
 </div>
 
-<!-- Vote confirmation (team reps) -->
+<!-- Vote confirmation (team reps & Pain Point vote) -->
 <div class="modal-ov" id="vote-confirm-modal">
   <div class="modal-box">
-    <h3>🗳️ Confirm Your Vote</h3>
-    <p>Cast your vote (<span id="confirm-points-label">1,000</span> marks) to:</p>
+    <h3 id="confirm-modal-title">🗳️ Confirm Your Vote</h3>
+    <p id="confirm-modal-message">Cast your vote (<span id="confirm-points-label">1,000</span> marks) to:</p>
     <div class="confirm-team-display" id="confirm-team-label">Team</div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeConfirmDialog()">Cancel</button>
-      <button class="btn btn-cta" onclick="confirmTeamVote()">Confirm Vote</button>
+      <button class="btn btn-cta" onclick="confirmVote()">Confirm Vote</button>
     </div>
   </div>
 </div>
@@ -78,52 +75,79 @@
         <div class="u-team-pill" id="u-team">–</div>
       </div>
     </div>
-    <button class="btn-logout" onclick="logout()">Logout</button>
+    <div class="user-bar-actions">
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
   </div>
 
   <div class="page-header" style="padding:.5rem 1rem 1rem;">
     <h1>PROJECT FARMER · KEYNOTE DAY 2026-07-18 · VOTING SYSTEM</h1>
   </div>
 
-  <div id="champ-banner">
-    <span class="crown">👑</span>
-    <h2>CHAMPION: <span id="champ-name">–</span></h2>
-    <p id="champ-pts">–</p>
-    <button type="button" id="champ-announce-btn" class="champ-announce-btn" hidden
-      aria-label="Open winner announcement" onclick="openWinnerAnnouncement()">📢</button>
+  <div id="interactive-display" class="interactive-display">
+    <div id="interactive-ready" class="interactive-panel">
+      <h2 class="interactive-ready-caption">Are you ready to vote?</h2>
+      <button type="button" class="btn btn-cta interactive-go-btn" onclick="startInteractiveVoting()">Let's go!</button>
+    </div>
+    <div id="interactive-voting" class="interactive-panel">
+      <div class="qr-voting-bg" aria-hidden="true">
+        <div class="qr-bg-gradient"></div>
+        <div class="qr-bg-rays"></div>
+        <div class="qr-bg-blob qr-bg-blob-1"></div>
+        <div class="qr-bg-blob qr-bg-blob-2"></div>
+        <div class="qr-bg-blob qr-bg-blob-3"></div>
+        <div class="qr-bg-blob qr-bg-blob-4"></div>
+        <span class="qr-bg-sparkle qr-bg-sparkle-1">✦</span>
+        <span class="qr-bg-sparkle qr-bg-sparkle-2">✧</span>
+        <span class="qr-bg-sparkle qr-bg-sparkle-3">★</span>
+        <span class="qr-bg-sparkle qr-bg-sparkle-4">✦</span>
+        <span class="qr-bg-sparkle qr-bg-sparkle-5">✧</span>
+        <span class="qr-bg-sparkle qr-bg-sparkle-6">★</span>
+        <span class="qr-bg-sparkle qr-bg-sparkle-7">✦</span>
+        <span class="qr-bg-sparkle qr-bg-sparkle-8">✧</span>
+      </div>
+      <div class="interactive-voting-content">
+        <p class="qr-scan-caption">Scan the QR Code below and start voting.</p>
+        <div class="qr-stage" aria-label="Scan to vote">
+          <span class="qr-deco qr-deco-tl" aria-hidden="true">✨</span>
+          <span class="qr-deco qr-deco-tc" aria-hidden="true">🎊</span>
+          <span class="qr-deco qr-deco-tr" aria-hidden="true">🎉</span>
+          <span class="qr-deco qr-deco-ml" aria-hidden="true">🎁</span>
+          <span class="qr-deco qr-deco-l" aria-hidden="true">🌟</span>
+          <span class="qr-deco qr-deco-bl" aria-hidden="true">🎈</span>
+          <span class="qr-deco qr-deco-bc" aria-hidden="true">🗳️</span>
+          <span class="qr-deco qr-deco-br" aria-hidden="true">🏆</span>
+          <span class="qr-deco qr-deco-mr" aria-hidden="true">💫</span>
+          <span class="qr-deco qr-deco-r" aria-hidden="true">⭐</span>
+          <span class="qr-deco qr-deco-extra-1" aria-hidden="true">🏅</span>
+          <span class="qr-deco qr-deco-extra-2" aria-hidden="true">🎯</span>
+          <div class="qr-frame">
+            <div class="qr-frame-glow" aria-hidden="true"></div>
+            <div class="qr-frame-ring" aria-hidden="true"></div>
+            <img class="qr-image" src="images/vote-qr-code.png" alt="Vote QR code">
+          </div>
+        </div>
+        <p class="voting-progress-text" id="voting-progress-text">Voting in progress...</p>
+        <button type="button" class="btn voting-done-btn" id="voting-done-btn" hidden
+          onclick="openWinnerAnnouncement()">Voting is done! And the winner is...</button>
+      </div>
+    </div>
   </div>
 
-  <div class="chart-wrap">
-    <div class="chart-head">
-      <h2>📊 Live Standings</h2>
-    </div>
-    <div class="chart-bars" id="chart-bars">
-      <div class="chart-grid" id="chart-grid"></div>
-    </div>
-  </div>
-
-  <div class="vote-section" id="vote-section">
+  <div class="vote-section interactive-only-hide" id="vote-section">
     <h2>🗳️ Cast Your Vote</h2>
     <p id="vote-instruction">Tap the team you think is best — you have one vote worth 1,000 marks.</p>
     <div class="vote-grid" id="vote-grid"></div>
   </div>
 
-  <div class="role-score-section" id="role-score-section">
-    <h2 id="role-score-title">Role Scoring</h2>
+  <div class="role-score-section interactive-only-hide" id="role-score-section">
+    <h2 id="role-score-title">🎓 Mentor Scoring</h2>
     <p id="role-score-hint"></p>
     <div class="role-score-grid" id="role-score-grid"></div>
-  </div>
-
-  <div class="matrix-wrap" id="matrix-wrap">
-    <div class="matrix-hdr">
-      📋 Vote Status Board
-      <span class="matrix-sub" id="matrix-sub">0 voters have submitted scores</span>
-    </div>
-    <div style="overflow-x:auto;">
-      <table class="matrix-table">
-        <thead id="matrix-thead"></thead>
-        <tbody id="matrix-body"></tbody>
-      </table>
+    <div class="pain-point-section" id="pain-point-section">
+      <h3 class="pain-point-title">📌 Pain Point Vote (1,000 marks)</h3>
+      <p id="pain-point-instruction">Tap the team to award your single Pain Point vote.</p>
+      <div class="vote-grid" id="pain-point-grid"></div>
     </div>
   </div>
 </div>
@@ -151,10 +175,8 @@
 <script src="js/supabase/client.js"></script>
 <script src="js/supabase/realtime.js"></script>
 <script src="js/auth/session.js"></script>
-<script src="js/ui/champion.js"></script>
 <script src="js/ui/winner-announcement.js"></script>
-<script src="js/ui/chart.js"></script>
-<script src="js/ui/matrix.js"></script>
+<script src="js/ui/interactive-display.js"></script>
 <script src="js/ui/voting-ui.js"></script>
 <script src="js/ui/assignment-modal.js"></script>
 <script src="js/auth/auth.js"></script>

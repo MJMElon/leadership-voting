@@ -10,15 +10,8 @@
     star.style.top = y + 'px';
     layer.appendChild(star);
 
-    const barEl = document.querySelector('.bar-slot.is-champ') ||
-      document.querySelector('.bar-slot');
-    let ex = innerWidth / 2;
-    let ey = 120;
-    if (barEl) {
-      const r = barEl.getBoundingClientRect();
-      ex = r.left + r.width / 2;
-      ey = r.top + r.height * 0.3;
-    }
+    const ex = innerWidth / 2;
+    const ey = 120;
 
     const dur = 800;
     const t0 = performance.now();

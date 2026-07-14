@@ -76,7 +76,6 @@
 
   function restoreMyVotesFromLog() {
     if (!LV.currentUser?.slot) return;
-    const fromTeam = LV.fromTeamForSlot(LV.currentUser.slot);
 
     if (LV.currentUser.slot.type === 'team') {
       const myVotes = LV.voteLog.filter(v => v.email === LV.currentUser.email);
@@ -85,11 +84,22 @@
         const target = LV.TEAMS.find(t => t.name === v.to);
         if (target) LV.setMyTeamVote({ teamId: target.id, confirmed: true });
       }
-    } else {
-      LV.voteLog.filter(v => v.email === LV.currentUser.email && v.from === fromTeam).forEach(v => {
+      return;
+    }
+
+    if (LV.currentUser.slot.roleId === 'mentor') {
+      LV.myRoleScores = {};
+      LV.voteLog.filter(v => v.email === LV.currentUser.email && v.from === 'Mentor').forEach(v => {
         const tid = LV.TEAMS.find(t => t.name === v.to)?.id;
         if (tid != null) LV.setMyRoleScore(tid, v.pts);
       });
+      const ppVote = LV.voteLog.find(v => v.email === LV.currentUser.email && v.from === 'Pain Point Marks');
+      if (ppVote) {
+        const target = LV.TEAMS.find(t => t.name === ppVote.to);
+        LV.setMyPainPointVote(target ? { teamId: target.id, confirmed: true } : null);
+      } else {
+        LV.setMyPainPointVote(null);
+      }
     }
   }
 

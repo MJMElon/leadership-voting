@@ -23,28 +23,22 @@
 
     const overlay = document.getElementById('winner-announcement');
     const teamEl = document.getElementById('winner-team-label');
-    const announceBtn = document.getElementById('champ-announce-btn');
     if (!overlay || !teamEl) return;
-    if (announceBtn) announceBtn.disabled = true;
 
-    try {
-      await LV.fadeOutVoteBgm(LV.VOTE_BGM_FADE_MS);
+    await LV.fadeOutVoteBgm(LV.VOTE_BGM_FADE_MS);
 
-      const result = await LV.dbSetWinnerAnnounced(true);
-      if (!result.ok) {
-        LV.showToast('Failed to open winner announcement. Try again.', true);
-        return;
-      }
-
-      teamEl.textContent = top.emoji + ' Team ' + top.id;
-      spawnCartoonElements(document.getElementById('winner-cartoon-layer'));
-      overlay.classList.add('show');
-      LV.startChampionBgm();
-      LV.launchConfetti(top.color);
-      LV.renderVotingUI();
-    } finally {
-      if (announceBtn) announceBtn.disabled = false;
+    const result = await LV.dbSetWinnerAnnounced(true);
+    if (!result.ok) {
+      LV.showToast('Failed to open winner announcement. Try again.', true);
+      return;
     }
+
+    teamEl.textContent = top.emoji + ' Team ' + top.id;
+    spawnCartoonElements(document.getElementById('winner-cartoon-layer'));
+    overlay.classList.add('show');
+    LV.startChampionBgm();
+    LV.launchConfetti(top.color);
+    LV.renderVotingUI();
   };
 
   LV.closeWinnerAnnouncement = async function () {

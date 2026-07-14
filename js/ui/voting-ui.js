@@ -1,5 +1,9 @@
 (function (LV) {
   let pendingVoteTeamId = null;
+  let pendingConfirmMode = null;
+
+  const MENTOR_FROM = 'Mentor';
+  const PAIN_POINT_FROM = 'Pain Point Marks';
 
   function hideVotingSections(section, roleSection) {
     if (section) section.style.display = 'none';
@@ -8,6 +12,10 @@
 
   function votingLocked() {
     return typeof LV.isVotingLocked === 'function' && LV.isVotingLocked();
+  }
+
+  function refreshAfterVote() {
+    LV.renderVotingUI();
   }
 
   LV.renderVotingUI = function () {
@@ -24,49 +32,58 @@
     if (LV.currentUser.slot.type === 'team') {
       section.style.display = 'block';
       roleSection.style.display = 'none';
-      renderTeamVoteCards(grid);
-    } else {
+      renderTeamVoteCards(grid, { lockOwnTeam: true });
+    } else if (LV.currentUser.slot.roleId === 'mentor') {
       section.style.display = 'none';
       roleSection.style.display = 'block';
-      renderRoleScoreInputs();
+      renderMentorPanel();
+    } else {
+      hideVotingSections(section, roleSection);
     }
   };
 
-  function renderTeamVoteCards(grid) {
-    const slot = LV.currentUser.slot;
-    const myTeamId = slot.teamId ?? slot.team?.id;
-    const hasVoted = LV.myTeamVote?.confirmed;
-    const votedTeamId = LV.myTeamVote?.teamId;
+  function renderTeamVoteCards(grid, opts) {
+    opts = opts || {};
+    const myTeamId = opts.myTeamId ?? (LV.currentUser.slot.teamId ?? LV.currentUser.slot.team?.id);
+    const hasVoted = opts.hasVoted ?? LV.myTeamVote?.confirmed;
+    const votedTeamId = opts.votedTeamId ?? LV.myTeamVote?.teamId;
     const locked = votingLocked();
+    const pts = opts.points ?? LV.TEAM_VOTE_PTS;
+    const instructionEl = opts.instructionEl || document.getElementById('vote-instruction');
+    const undoWrapId = opts.undoWrapId || 'vote-undo-wrap';
+    const onTap = opts.onTap || ((t) => openConfirmDialog(t, 'team'));
+    const onUndo = opts.onUndo || undoTeamVote;
+    const voteLabel = opts.voteLabel || 'Voted';
 
-    const instruction = document.getElementById('vote-instruction');
-    if (locked) {
-      instruction.textContent = hasVoted
-        ? '✓ Voted — ' + LV.TEAM_VOTE_PTS.toLocaleString() + ' marks to ' +
+    if (instructionEl) {
+      if (locked) {
+        instructionEl.textContent = hasVoted
+          ? '✓ ' + voteLabel + ' — ' + pts.toLocaleString() + ' marks to ' +
+            (LV.TEAMS.find(t => t.id === votedTeamId)?.name || 'a team') +
+            '. Voting is locked while the winner announcement is displayed.'
+          : 'Voting is locked while the winner announcement is displayed.';
+      } else if (hasVoted) {
+        instructionEl.textContent =
+          '✓ ' + voteLabel + ' — ' + pts.toLocaleString() + ' marks to ' +
           (LV.TEAMS.find(t => t.id === votedTeamId)?.name || 'a team') +
-          '. Voting is locked while the winner announcement is displayed.'
-        : 'Voting is locked while the winner announcement is displayed.';
-    } else if (hasVoted) {
-      instruction.textContent =
-        '✓ Voted — ' + LV.TEAM_VOTE_PTS.toLocaleString() + ' marks to ' +
-        (LV.TEAMS.find(t => t.id === votedTeamId)?.name || 'a team') +
-        '. Tap Undo to change your vote.';
-    } else {
-      instruction.textContent =
-        'Tap the team you think is best — you have one vote worth 1,000 marks.';
+          '. Tap Undo to change your vote.';
+      } else {
+        instructionEl.textContent = opts.emptyInstruction ||
+          'Tap the team you think is best — you have one vote worth 1,000 marks.';
+      }
     }
 
     grid.innerHTML = '';
 
     LV.TEAMS.forEach(t => {
-      const isOwn = t.id === myTeamId;
+      const isOwn = opts.lockOwnTeam && t.id === myTeamId;
       const isVoted = hasVoted && votedTeamId === t.id;
-      const isLocked = hasVoted && !isVoted;
+      const isLocked = isOwn || (hasVoted && !isVoted) || locked;
 
       const card = document.createElement('div');
       card.className = 'vote-card' +
         (isOwn ? ' is-own' : '') +
-        (isLocked || locked ? ' is-locked' : '') +
+        (isLocked ? ' is-locked' : '') +
         (isVoted ? ' is-voted' : '');
 
       card.innerHTML =
@@ -76,47 +93,56 @@
           '<span class="vc-name">' + t.name + '</span>' +
           (isOwn ? '<span class="vc-badge">Your team</span>' : '') +
           (isVoted ? '<span class="vc-badge voted">✓ Voted</span>' : '') +
-          (isLocked ? '<span class="vc-badge locked">Locked</span>' : '') +
+          (!isOwn && isLocked && !isVoted ? '<span class="vc-badge locked">Locked</span>' : '') +
         '</div>';
 
       if (!isOwn && !hasVoted && !locked) {
-        card.onclick = () => openConfirmDialog(t);
+        card.onclick = () => onTap(t);
       }
       grid.appendChild(card);
     });
 
-    let undoWrap = document.getElementById('vote-undo-wrap');
+    const parent = grid.parentElement;
+    let undoWrap = document.getElementById(undoWrapId);
     if (hasVoted && !locked) {
       if (!undoWrap) {
         undoWrap = document.createElement('div');
-        undoWrap.id = 'vote-undo-wrap';
+        undoWrap.id = undoWrapId;
         undoWrap.className = 'vote-undo-wrap';
-        grid.parentElement.appendChild(undoWrap);
+        parent.appendChild(undoWrap);
       }
       undoWrap.innerHTML =
-        '<button type="button" class="btn-undo-score" id="vote-undo-btn">Undo Vote</button>';
-      undoWrap.querySelector('#vote-undo-btn').onclick = undoTeamVote;
+        '<button type="button" class="btn-undo-score" id="' + undoWrapId + '-btn">Undo Vote</button>';
+      undoWrap.querySelector('button').onclick = onUndo;
       undoWrap.style.display = 'block';
     } else if (undoWrap) {
       undoWrap.style.display = 'none';
     }
   }
 
-  function openConfirmDialog(team) {
+  function openConfirmDialog(team, mode) {
     if (votingLocked()) {
       LV.showToast('Voting is locked while the winner announcement is displayed.', true);
       return;
     }
     pendingVoteTeamId = team.id;
+    pendingConfirmMode = mode;
     LV.setConfirmDialogOpen(true);
+
+    const pts = mode === 'painPoint' ? LV.PAIN_POINT_VOTE_PTS : LV.TEAM_VOTE_PTS;
+    document.getElementById('confirm-modal-title').textContent =
+      mode === 'painPoint' ? '📌 Confirm Pain Point Vote' : '🗳️ Confirm Your Vote';
+    document.getElementById('confirm-modal-message').innerHTML =
+      (mode === 'painPoint' ? 'Cast your Pain Point vote' : 'Cast your vote') +
+      ' (<span id="confirm-points-label">' + pts.toLocaleString() + '</span> marks) to:';
     document.getElementById('confirm-team-label').textContent = team.emoji + ' ' + team.name;
-    document.getElementById('confirm-points-label').textContent = LV.TEAM_VOTE_PTS.toLocaleString();
     document.getElementById('vote-confirm-modal').classList.add('open');
   }
 
   LV.closeConfirmDialog = function () {
     LV.setConfirmDialogOpen(false);
     pendingVoteTeamId = null;
+    pendingConfirmMode = null;
     document.getElementById('vote-confirm-modal').classList.remove('open');
   };
 
@@ -124,7 +150,6 @@
     if (!LV.myTeamVote?.confirmed || votingLocked()) return;
 
     const votedTeamId = LV.myTeamVote.teamId;
-    const team = LV.TEAMS.find(t => t.id === votedTeamId);
     const fromTeam = LV.fromTeamForSlot(LV.currentUser.slot);
 
     const result = await LV.dbUndoTeamVote();
@@ -135,26 +160,40 @@
 
     LV.setMyTeamVote(null);
     LV.votes[votedTeamId] = Math.max(0, (LV.votes[votedTeamId] || 0) - LV.TEAM_VOTE_PTS);
-    for (let i = LV.voteLog.length - 1; i >= 0; i--) {
-      if (LV.voteLog[i].email === LV.currentUser.email && LV.voteLog[i].from === fromTeam) {
-        LV.voteLog.splice(i, 1);
-      }
-    }
+    removeVoteLogEntry(LV.currentUser.email, fromTeam);
 
-    LV.renderChart();
-    LV.renderVotingUI();
-    LV.updateMatrix();
-    LV.checkChampion();
+    refreshAfterVote();
     LV.showToast('Vote cleared — tap a team to vote again');
   }
+
+  function removeVoteLogEntry(email, fromTeam, toTeamName) {
+    for (let i = LV.voteLog.length - 1; i >= 0; i--) {
+      const entry = LV.voteLog[i];
+      if (entry.email !== email || entry.from !== fromTeam) continue;
+      if (toTeamName && entry.to !== toTeamName) continue;
+      LV.voteLog.splice(i, 1);
+      if (!toTeamName) break;
+    }
+  }
+
+  LV.confirmVote = async function () {
+    if (pendingConfirmMode === 'painPoint') {
+      return confirmPainPointVote();
+    }
+    return LV.confirmTeamVote();
+  };
 
   LV.confirmTeamVote = async function () {
     const teamId = pendingVoteTeamId;
     if (!teamId || LV.myTeamVote?.confirmed || votingLocked()) return;
+
+    const myTeamId = LV.currentUser.slot.teamId ?? LV.currentUser.slot.team?.id;
+    if (teamId === myTeamId) return;
+
     LV.closeConfirmDialog();
 
     const team = LV.TEAMS.find(t => t.id === teamId);
-    const card = document.querySelector('.vote-card:not(.is-own):not(.is-locked)');
+    const card = document.querySelector('#vote-grid .vote-card:not(.is-own):not(.is-locked)');
 
     const result = await LV.dbSaveTeamVote(teamId);
     if (!result.ok) {
@@ -174,10 +213,7 @@
     LV.playWhoosh();
     const afterVote = () => {
       LV.playCoin();
-      LV.renderChart();
-      LV.renderVotingUI();
-      LV.updateMatrix();
-      LV.checkChampion();
+      refreshAfterVote();
       LV.showToast(LV.TEAM_VOTE_PTS.toLocaleString() + ' marks → ' + team.name + '!');
     };
 
@@ -189,20 +225,76 @@
     }
   };
 
+  async function confirmPainPointVote() {
+    const teamId = pendingVoteTeamId;
+    if (!teamId || LV.myPainPointVote?.confirmed || votingLocked()) return;
+    LV.closeConfirmDialog();
+
+    const team = LV.TEAMS.find(t => t.id === teamId);
+    const card = document.querySelector('#pain-point-grid .vote-card:not(.is-locked)');
+
+    const result = await LV.dbSavePainPointVote(teamId);
+    if (!result.ok) {
+      LV.showToast('Failed to save Pain Point vote. Try again.', true);
+      return;
+    }
+    if (result.id != null) LV.ourVoteIds.add(result.id);
+
+    LV.setMyPainPointVote({ teamId, confirmed: true });
+    LV.votes[teamId] = (LV.votes[teamId] || 0) + LV.PAIN_POINT_VOTE_PTS;
+    LV.voteLog.unshift({
+      id: result.id, voter: LV.currentUser.name, email: LV.currentUser.email,
+      from: PAIN_POINT_FROM, to: team.name,
+      pts: LV.PAIN_POINT_VOTE_PTS, time: new Date().toLocaleTimeString(),
+    });
+
+    LV.playWhoosh();
+    const afterVote = () => {
+      LV.playCoin();
+      refreshAfterVote();
+      LV.showToast('Pain Point vote — ' + LV.PAIN_POINT_VOTE_PTS.toLocaleString() + ' marks → ' + team.name + '!');
+    };
+
+    if (card) {
+      const rect = card.getBoundingClientRect();
+      LV.animStarBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, team.color, afterVote);
+    } else {
+      afterVote();
+    }
+  }
+
+  async function undoPainPointVote() {
+    if (!LV.myPainPointVote?.confirmed || votingLocked()) return;
+
+    const votedTeamId = LV.myPainPointVote.teamId;
+
+    const result = await LV.dbUndoPainPointVote();
+    if (!result.ok) {
+      LV.showToast('Failed to undo vote. Try again.', true);
+      return;
+    }
+
+    LV.setMyPainPointVote(null);
+    LV.votes[votedTeamId] = Math.max(0, (LV.votes[votedTeamId] || 0) - LV.PAIN_POINT_VOTE_PTS);
+    removeVoteLogEntry(LV.currentUser.email, PAIN_POINT_FROM);
+
+    refreshAfterVote();
+    LV.showToast('Pain Point vote cleared — tap a team to vote again');
+  }
+
+  function renderMentorPanel() {
+    renderRoleScoreInputs();
+    renderPainPointVoteCards();
+  }
+
   function renderRoleScoreInputs() {
-    const isMentor = LV.currentUser.slot.roleId === 'mentor';
-    const min = isMentor ? LV.MENTOR_MIN_PTS : LV.PAIN_POINT_MIN_PTS;
-    const max = isMentor ? LV.MENTOR_MAX_PTS : null;
-    const fromTeam = LV.fromTeamForSlot(LV.currentUser.slot);
+    const fromTeam = MENTOR_FROM;
     const locked = votingLocked();
 
-    document.getElementById('role-score-title').textContent =
-      isMentor ? '🎓 Mentor Scoring' : '📌 Pain Point Marks';
+    document.getElementById('role-score-title').textContent = '🎓 Mentor Scoring';
     document.getElementById('role-score-hint').textContent = locked
       ? 'Scoring is locked while the winner announcement is displayed.'
-      : isMentor
-        ? 'Enter 0–3,000 marks per team and submit. Submitted rows lock — tap Undo to change a score.'
-        : 'Enter marks per team (minimum 0, no maximum) and submit. Submitted rows lock — tap Undo to change a score.';
+      : 'Enter 0–3,000 marks per team and submit. Submitted rows lock — tap Undo to change a score.';
 
     const grid = document.getElementById('role-score-grid');
     grid.innerHTML = '';
@@ -222,8 +314,8 @@
           (isLocked ? '<span class="rs-saved">Saved: ' + saved.toLocaleString() + '</span>' : '') +
         '</div>' +
         '<input type="number" class="role-score-inp' + (isLocked || locked ? ' is-locked' : '') + '" data-team-id="' + t.id + '"' +
-          ' min="' + min + '"' + (max != null ? ' max="' + max + '"' : '') +
-          ' inputmode="numeric" placeholder="0" aria-label="Score for ' + t.name + '"' +
+          ' min="' + LV.MENTOR_MIN_PTS + '" max="' + LV.MENTOR_MAX_PTS + '"' +
+          ' inputmode="numeric" placeholder="0" aria-label="Mentor score for ' + t.name + '"' +
           (isLocked || locked ? ' disabled' : '') +
           ' value="' + (isLocked ? saved : (draft ?? (saved != null ? saved : ''))) + '">' +
         (canUndo
@@ -231,11 +323,12 @@
           : (isLocked
             ? '<button type="button" class="btn-submit-score is-disabled" data-team-id="' + t.id + '" disabled>Submit</button>'
             : '<button type="button" class="btn-submit-score" data-team-id="' + t.id + '">Submit</button>'));
+
       grid.appendChild(row);
     });
 
     grid.querySelectorAll('.btn-submit-score:not(.is-disabled)').forEach(btn => {
-      btn.onclick = () => submitRoleScore(parseInt(btn.dataset.teamId, 10), isMentor, fromTeam);
+      btn.onclick = () => submitRoleScore(parseInt(btn.dataset.teamId, 10), fromTeam);
     });
 
     grid.querySelectorAll('.btn-undo-score').forEach(btn => {
@@ -250,9 +343,26 @@
       inp.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          submitRoleScore(parseInt(inp.dataset.teamId, 10), isMentor, fromTeam);
+          submitRoleScore(parseInt(inp.dataset.teamId, 10), fromTeam);
         }
       });
+    });
+  }
+
+  function renderPainPointVoteCards() {
+    const grid = document.getElementById('pain-point-grid');
+    if (!grid) return;
+
+    renderTeamVoteCards(grid, {
+      hasVoted: LV.myPainPointVote?.confirmed,
+      votedTeamId: LV.myPainPointVote?.teamId,
+      points: LV.PAIN_POINT_VOTE_PTS,
+      instructionEl: document.getElementById('pain-point-instruction'),
+      undoWrapId: 'pain-point-undo-wrap',
+      onTap: (t) => openConfirmDialog(t, 'painPoint'),
+      onUndo: undoPainPointVote,
+      voteLabel: 'Pain Point vote',
+      emptyInstruction: 'Tap the team to award your Pain Point vote — one vote worth 1,000 marks.',
     });
   }
 
@@ -275,22 +385,13 @@
     delete LV.roleScoreDrafts[teamId];
     LV.votes[teamId] = Math.max(0, (LV.votes[teamId] || 0) - oldPts);
     const tName = team?.name || '';
-    for (let i = LV.voteLog.length - 1; i >= 0; i--) {
-      if (LV.voteLog[i].email === LV.currentUser.email &&
-          LV.voteLog[i].to === tName &&
-          LV.voteLog[i].from === fromTeam) {
-        LV.voteLog.splice(i, 1);
-      }
-    }
+    removeVoteLogEntry(LV.currentUser.email, fromTeam, tName);
 
-    LV.renderChart();
-    LV.renderVotingUI();
-    LV.updateMatrix();
-    LV.checkChampion();
+    refreshAfterVote();
     LV.showToast('Score cleared for ' + tName + ' — re-enter to submit');
   }
 
-  async function submitRoleScore(teamId, isMentor, fromTeam, opts) {
+  async function submitRoleScore(teamId, fromTeam, opts) {
     opts = opts || {};
     if (votingLocked()) {
       if (!opts.silent) {
@@ -305,7 +406,7 @@
 
     let pts = parseInt(inp.value, 10);
     if (isNaN(pts) || pts < 0) pts = 0;
-    if (isMentor && pts > LV.MENTOR_MAX_PTS) {
+    if (pts > LV.MENTOR_MAX_PTS) {
       pts = LV.MENTOR_MAX_PTS;
       inp.classList.add('input-error');
       if (!opts.silent) {
@@ -335,10 +436,7 @@
     });
 
     if (!opts.silent) LV.playCoin();
-    LV.renderChart();
-    if (!opts.skipRerender) LV.renderVotingUI();
-    LV.updateMatrix();
-    LV.checkChampion();
+    if (!opts.skipRerender) refreshAfterVote();
     if (!opts.silent) LV.showToast(pts.toLocaleString() + ' marks → ' + tName);
   }
 })(window.LV);

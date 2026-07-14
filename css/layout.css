@@ -81,65 +81,11 @@
   font-weight: 700;
 }
 
-#champ-banner {
-  display: none;
-  position: relative;
-  text-align: center;
-  padding: 1.2rem;
-  margin: 0 auto 1.5rem;
-  max-width: 720px;
-  background: linear-gradient(135deg, var(--gold), #FFE566, var(--gold-dark));
-  border: 4px solid var(--border-chunky);
-  border-radius: 20px;
-  box-shadow: var(--shadow-pop);
-}
-
-#champ-banner.show {
-  display: block;
-  animation: shimmer 2.5s ease-in-out infinite;
-}
-
-@keyframes shimmer {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.08); }
-}
-
-#champ-banner h2 {
-  font-family: var(--font-display);
-  font-size: clamp(1rem, 3vw, 1.6rem);
-  margin-bottom: .2rem;
-}
-
-#champ-banner p {
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.crown { font-size: 2rem; display: inline-block; animation: floatT 2s ease-in-out infinite; }
-
-.champ-announce-btn {
-  position: absolute;
-  right: .75rem;
-  bottom: .75rem;
-  width: 3rem;
-  height: 3rem;
-  border: 3px solid var(--border-chunky);
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
-  font-size: 1.5rem;
-  cursor: pointer;
+.user-bar-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: transform .15s ease;
-  touch-action: manipulation;
+  gap: .6rem;
 }
-
-.champ-announce-btn:hover { transform: scale(1.08); }
-.champ-announce-btn:active { transform: scale(.95) translateY(3px); box-shadow: 0 2px 0 var(--border-chunky); }
-.champ-announce-btn[hidden] { display: none !important; }
 
 .winner-announcement {
   display: none;
@@ -430,6 +376,25 @@
 .vc-badge.locked { background: #EDE9FE; color: var(--ink-muted); }
 
 .role-score-grid { display: flex; flex-direction: column; gap: .65rem; }
+
+.pain-point-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 3px dashed rgba(45, 27, 78, .2);
+}
+
+.pain-point-title {
+  font-family: var(--font-display);
+  font-size: .9rem;
+  margin-bottom: .35rem;
+}
+
+.pain-point-section p {
+  color: var(--ink-muted);
+  font-size: .84rem;
+  margin-bottom: .9rem;
+  font-weight: 700;
+}
 
 .role-score-row {
   display: flex;

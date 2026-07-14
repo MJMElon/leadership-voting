@@ -22,6 +22,26 @@
     return [...LV.TEAMS].sort((a, b) => (LV.votes[b.id] || 0) - (LV.votes[a.id] || 0));
   };
 
+  LV.isVotingComplete = function () {
+    if (!Array.isArray(LV.TEAMS) || !LV.TEAMS.length) return false;
+
+    const teamVotesDone = LV.TEAMS.every(team =>
+      LV.voteLog.some(v => v.from === team.name)
+    );
+
+    const mentorScoredTeams = new Set(
+      LV.voteLog
+        .filter(v => v.from === 'Mentor')
+        .map(v => LV.TEAMS.find(t => t.name === v.to)?.id)
+        .filter(id => id != null)
+    );
+    const mentorDone = LV.TEAMS.every(t => mentorScoredTeams.has(t.id));
+
+    const painPointDone = LV.voteLog.some(v => v.from === 'Pain Point Marks');
+
+    return teamVotesDone && mentorDone && painPointDone;
+  };
+
   LV.buildSlotFromKey = function (slotKey) {
     const parsed = LV.parseSlotKey(slotKey);
     if (!parsed) return null;

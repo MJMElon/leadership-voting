@@ -9,9 +9,17 @@
     champion: 'sounds/champion.mp3',
   };
 
+  const ONE_SHOT_PATHS = {
+    doneVote: 'sounds/done_vote.mp3',
+  };
+
   const bgmCache = {
     vote: { el: null, ready: false },
     champion: { el: null, ready: false },
+  };
+
+  const oneShotCache = {
+    doneVote: { el: null, ready: false },
   };
 
   function getAudio() {
@@ -61,6 +69,33 @@
     });
   }
 
+  function preloadOneShot(key) {
+    const track = oneShotCache[key];
+    if (!track.el) {
+      track.el = new Audio(ONE_SHOT_PATHS[key]);
+      track.el.preload = 'auto';
+      track.el.loop = false;
+    }
+    const el = track.el;
+    if (track.ready) return Promise.resolve();
+
+    return new Promise(resolve => {
+      const finish = () => {
+        track.ready = true;
+        el.pause();
+        el.currentTime = 0;
+        resolve();
+      };
+      if (el.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+        finish();
+        return;
+      }
+      el.addEventListener('canplaythrough', finish, { once: true });
+      el.addEventListener('error', finish, { once: true });
+      el.load();
+    });
+  }
+
   function cancelVoteBgmFade() {
     if (voteBgmFadeId != null) {
       cancelAnimationFrame(voteBgmFadeId);
@@ -68,12 +103,15 @@
     }
   }
 
-  LV.preloadInteractiveBgm = function () {
+  LV.preloadInteractiveSounds = function () {
     return Promise.all([
       preloadTrack('vote'),
       preloadTrack('champion'),
+      preloadOneShot('doneVote'),
     ]);
   };
+
+  LV.preloadInteractiveBgm = LV.preloadInteractiveSounds;
 
   LV.releaseInteractiveBgm = function () {
     cancelVoteBgmFade();
@@ -81,10 +119,13 @@
     championBgmEl = null;
     stopEl(bgmCache.vote.el);
     stopEl(bgmCache.champion.el);
+    stopEl(oneShotCache.doneVote.el);
     bgmCache.vote.el = null;
     bgmCache.vote.ready = false;
     bgmCache.champion.el = null;
     bgmCache.champion.ready = false;
+    oneShotCache.doneVote.el = null;
+    oneShotCache.doneVote.ready = false;
   };
 
   LV.startVoteBgm = function () {
@@ -151,6 +192,24 @@
   LV.stopAllBgm = function () {
     LV.stopVoteBgm();
     LV.stopChampionBgm();
+  };
+
+  LV.playDoneVoteSound = function () {
+    LV.stopVoteBgm();
+    if (!oneShotCache.doneVote.el) {
+      oneShotCache.doneVote.el = new Audio(ONE_SHOT_PATHS.doneVote);
+      oneShotCache.doneVote.el.preload = 'auto';
+      oneShotCache.doneVote.el.loop = false;
+    }
+    const el = oneShotCache.doneVote.el;
+    el.pause();
+    el.currentTime = 0;
+    el.volume = 1;
+    el.play().catch(() => {});
+  };
+
+  LV.stopDoneVoteSound = function () {
+    stopEl(oneShotCache.doneVote.el);
   };
 
   LV.playWhoosh = function () {

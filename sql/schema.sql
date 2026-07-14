@@ -7,7 +7,11 @@ create table if not exists sessions (
   name      text not null,
   locked_at timestamptz default now()
 );
-create unique index if not exists sessions_email_unique on sessions (email);
+-- Mentor login locks role:mentor + role:pain_point_marks under the same identifier.
+-- Uniqueness is enforced per slot_key (PK), not per email.
+
+-- Migration from earlier schema (if sessions_email_unique exists):
+-- drop index if exists sessions_email_unique;
 
 create table if not exists votes (
   id          serial primary key,

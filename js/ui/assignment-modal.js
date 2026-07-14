@@ -9,16 +9,12 @@
 
   function renderAssignmentGrid() {
     const teamGrid = document.getElementById('team-slot-grid');
-    const roleGrid = document.getElementById('role-slot-grid');
     teamGrid.innerHTML = '';
-    roleGrid.innerHTML = '';
 
-    LV.SLOT_KEYS.forEach(slotKey => {
+    LV.TEAM_SLOT_KEYS.forEach(slotKey => {
       const info = LV.slotDisplayInfo(slotKey);
-      const isTeam = slotKey.startsWith('team:');
       const owner = LV.getSlotOwnerEmail(slotKey);
       const taken = !!owner && owner !== pendingUser?.email;
-      const grid = isTeam ? teamGrid : roleGrid;
 
       const btn = document.createElement('button');
       btn.className = 'slot-btn' + (taken ? ' is-locked' : '');
@@ -34,7 +30,7 @@
           setTimeout(() => btn.classList.remove('shake'), 400);
         };
       }
-      grid.appendChild(btn);
+      teamGrid.appendChild(btn);
     });
   }
 
