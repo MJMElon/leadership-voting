@@ -156,7 +156,11 @@
 <div id="winner-announcement" class="winner-announcement" onclick="if(event.target===this)closeWinnerAnnouncement()">
   <div class="winner-celebration-bg" aria-hidden="true"></div>
   <div class="winner-cartoon-layer" id="winner-cartoon-layer" aria-hidden="true"></div>
-  <div class="winner-caption">
+  <div id="winner-suspense" class="winner-suspense is-hidden">
+    <p class="winner-suspense-title" id="winner-suspense-title">Counting the marks...</p>
+    <div class="winner-lb-chart" id="winner-lb-chart" aria-label="Leaderboard"></div>
+  </div>
+  <div class="winner-caption is-hidden" id="winner-caption">
     <p class="winner-line">Congratulations to</p>
     <p class="winner-team" id="winner-team-label">Team 1</p>
     <p class="winner-line">For winning today's keynote day!</p>

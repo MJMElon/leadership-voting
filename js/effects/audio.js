@@ -4,6 +4,9 @@
   let championBgmEl = null;
   let voteBgmFadeId = null;
 
+  const INTERACTIVE_BGM_KEYS = ['vote', 'champion'];
+  const INTERACTIVE_ONE_SHOT_KEYS = ['doneVote', 'drumRoll'];
+
   const BGM_PATHS = {
     vote: 'sounds/vote_bgm.mp3',
     champion: 'sounds/champion.mp3',
@@ -11,6 +14,7 @@
 
   const ONE_SHOT_PATHS = {
     doneVote: 'sounds/done_vote.mp3',
+    drumRoll: 'sounds/drum_roll.mp3',
   };
 
   const bgmCache = {
@@ -20,6 +24,7 @@
 
   const oneShotCache = {
     doneVote: { el: null, ready: false },
+    drumRoll: { el: null, ready: false },
   };
 
   function getAudio() {
@@ -69,14 +74,19 @@
     });
   }
 
-  function preloadOneShot(key) {
+  function ensureOneShotEl(key) {
     const track = oneShotCache[key];
     if (!track.el) {
       track.el = new Audio(ONE_SHOT_PATHS[key]);
       track.el.preload = 'auto';
       track.el.loop = false;
     }
-    const el = track.el;
+    return track.el;
+  }
+
+  function preloadOneShot(key) {
+    const track = oneShotCache[key];
+    const el = ensureOneShotEl(key);
     if (track.ready) return Promise.resolve();
 
     return new Promise(resolve => {
@@ -105,9 +115,8 @@
 
   LV.preloadInteractiveSounds = function () {
     return Promise.all([
-      preloadTrack('vote'),
-      preloadTrack('champion'),
-      preloadOneShot('doneVote'),
+      ...INTERACTIVE_BGM_KEYS.map(preloadTrack),
+      ...INTERACTIVE_ONE_SHOT_KEYS.map(preloadOneShot),
     ]);
   };
 
@@ -120,12 +129,15 @@
     stopEl(bgmCache.vote.el);
     stopEl(bgmCache.champion.el);
     stopEl(oneShotCache.doneVote.el);
+    stopEl(oneShotCache.drumRoll.el);
     bgmCache.vote.el = null;
     bgmCache.vote.ready = false;
     bgmCache.champion.el = null;
     bgmCache.champion.ready = false;
     oneShotCache.doneVote.el = null;
     oneShotCache.doneVote.ready = false;
+    oneShotCache.drumRoll.el = null;
+    oneShotCache.drumRoll.ready = false;
   };
 
   LV.startVoteBgm = function () {
@@ -194,22 +206,29 @@
     LV.stopChampionBgm();
   };
 
-  LV.playDoneVoteSound = function () {
-    LV.stopVoteBgm();
-    if (!oneShotCache.doneVote.el) {
-      oneShotCache.doneVote.el = new Audio(ONE_SHOT_PATHS.doneVote);
-      oneShotCache.doneVote.el.preload = 'auto';
-      oneShotCache.doneVote.el.loop = false;
-    }
-    const el = oneShotCache.doneVote.el;
+  function playOneShot(key) {
+    const el = ensureOneShotEl(key);
     el.pause();
     el.currentTime = 0;
     el.volume = 1;
     el.play().catch(() => {});
+  }
+
+  LV.playDoneVoteSound = function () {
+    LV.stopVoteBgm();
+    playOneShot('doneVote');
   };
 
   LV.stopDoneVoteSound = function () {
     stopEl(oneShotCache.doneVote.el);
+  };
+
+  LV.playDrumRollSound = function () {
+    playOneShot('drumRoll');
+  };
+
+  LV.stopDrumRollSound = function () {
+    stopEl(oneShotCache.drumRoll.el);
   };
 
   LV.playWhoosh = function () {

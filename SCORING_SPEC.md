@@ -289,11 +289,11 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 - User bar: avatar 📺, name "Interactive", pill "📺 Interactive".
 - Receives realtime / polling updates.
 - **No** row in `sessions`; **no** votes persisted. Logout clears local interactive session only.
-- **Audio preload (login):** on Interactive login, **preload all MP3 assets** used in this mode (`sounds/vote_bgm.mp3`, `sounds/champion.mp3`, `sounds/done_vote.mp3`) into the browser cache. **Do not start playback** until the user taps **Let's go!** (§8.8).
+- **Audio preload (login):** on Interactive login, **preload all MP3 assets** used in this mode (`sounds/vote_bgm.mp3`, `sounds/champion.mp3`, `sounds/done_vote.mp3`, `sounds/drum_roll.mp3`) into the browser cache. **Do not start playback** until the user taps **Let's go!** (§8.8).
 - **Two-phase event display (§8.8):**
   1. **Ready screen** — large colorful caption **"Are you ready to vote?"** and tappable **"Let's go!"** button.
   2. **Voting screen** — on **Let's go!** tap: cross-fade from ready screen to voting screen; **start looping** `sounds/vote_bgm.mp3`; show large centered QR code (`images/vote-qr-code.png`) with decorative frame; animated caption **"Voting in progress..."** below the QR.
-- **Winner announcement (§8.9):** opened from the **"Voting is done! And the winner is..."** button (§8.8). **Fade out** any playing `vote_bgm.mp3` over 1 second, then open winner overlay and loop `champion.mp3` (§10).
+- **Winner announcement (§8.9):** opened from the **"Voting is done! And the winner is..."** button (§8.8). **Fade out** any playing `vote_bgm.mp3` over 1 second, then open winner overlay; play `sounds/drum_roll.mp3` once during the suspense leaderboard, then loop `champion.mp3` when the winner caption appears (§10).
 
 
 
@@ -801,7 +801,29 @@ Shown only for `interactive` keyword login (§4.6). Replaces the main voting/sco
 
 Full-screen overlay opened from the **"Voting is done! And the winner is..."** button (`#voting-done-btn`, §8.8). Uses current **#1 team** from vote totals (`getRanks()[0]`).
 
-**Layout:**
+**Two-phase reveal:**
+
+1. **Suspense leaderboard** — four vertical bars (one per team) with live mark counts; chart scale max is the **next 1,000** above the highest team total (e.g. 4,500 → 5,000); bars scroll up and down randomly, animation speed ramps down over **5.3 seconds** (`WINNER_SUSPENSE_MS`), then each bar stabilizes on that team's final earned marks (`votes[team_id]`). Winning team's bar gets a champion glow. Play `sounds/drum_roll.mp3` **once** when bar animation starts.
+2. **Winner caption** — after bars settle, hold on the final leaderboard for **2.5 seconds** (`WINNER_CAPTION_REVEAL_MS`), then cross-fade to the celebration caption, start looping `champion.mp3`, floating cartoon elements, and confetti.
+
+**Layout (Phase 1 — suspense):**
+
+```
+┌────────────────────────────────────────────┐
+│  (animated celebration background)         │
+│                                            │
+│        Counting the marks...               │
+│  ┌────────────────────────────────────┐  │
+│  │ 4,200  3,100  5,800  2,900           │  │
+│  │  ████   ███    █████  ███            │  │  ← bars jump randomly,
+│  │  ████   ██     █████  ██             │  │    then slow & settle
+│  │  🔥1    ⚡2    🌊3    🦁4            │  │
+│  └────────────────────────────────────┘  │
+│  [ ✕ close ]                               │
+└────────────────────────────────────────────┘
+```
+
+**Layout (Phase 2 — winner caption):**
 
 ```
 ┌────────────────────────────────────────────┐
@@ -826,10 +848,12 @@ For winning today's keynote day!
 
 **Behavior:**
 
-- **Open:** tap **"Voting is done! And the winner is..."** (§8.8) while Interactive; **fade out** `vote_bgm.mp3` over **1 second** (`VOTE_BGM_FADE_MS`) if still playing; then set `event_state.winner_announced = true` (locks all vote/score undo and submit on every client), open overlay, and start `champion.mp3` (§10).
-- **Close:** ✕ control or tap backdrop; set `event_state.winner_announced = false`; stops `champion.mp3` loop only (`vote_bgm.mp3` does **not** resume); undo and re-vote/re-key allowed again.
-- **Audio:** loop `sounds/champion.mp3` infinitely while overlay is open (§10).
-- **Motion:** CSS/keyframe celebration background (gradient shimmer, confetti-like particles); multiple animated cartoon elements (stars ⭐, balloons 🎈, party poppers 🎉) drifting/bouncing — align with §7 Cartoon Game Leaderboard.
+- **Open:** tap **"Voting is done! And the winner is..."** (§8.8) while Interactive; **fade out** `vote_bgm.mp3` over **1 second** (`VOTE_BGM_FADE_MS`) if still playing; then set `event_state.winner_announced = true` (locks all vote/score undo and submit on every client), open overlay, show suspense leaderboard, and play `sounds/drum_roll.mp3` once (§10).
+- **Suspense animation:** each team bar **starts at a random mark** (random sine phase). Bars then **sweep the full chart range** (0 → max) up and down via sine oscillation; sweep speed and amplitude ramp down over **5.3 s** while the oscillation center drifts toward each team's final total; bars lock on final marks, then winning team column gets `.is-winner` glow.
+- **Caption reveal:** after suspense completes, hold the settled leaderboard for **2.5 s**, then hide leaderboard, show winner caption, start looping `champion.mp3`, confetti, and floating cartoon elements.
+- **Close:** ✕ control or tap backdrop; set `event_state.winner_announced = false`; stops `champion.mp3` and any playing `drum_roll.mp3`; `vote_bgm.mp3` does **not** resume; undo and re-vote/re-key allowed again.
+- **Audio:** `drum_roll.mp3` once during suspense; `champion.mp3` loops only after winner caption appears (§10).
+- **Motion:** CSS/keyframe celebration background (gradient shimmer); Phase 2 adds confetti and cartoon elements (stars ⭐, balloons 🎈, party poppers 🎉) — align with §7 Cartoon Game Leaderboard.
 - Winning team emoji may appear beside the team number in the headline (optional accent; number is required).
 
 ---
@@ -889,14 +913,15 @@ Cartoon-game flavored effects — playful, not sci-fi. Align with §7.8 motion c
 
 | When                             | Asset                 | Behavior                                                                                        |
 | -------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------- |
-| Interactive login                | `sounds/vote_bgm.mp3`, `sounds/champion.mp3`, `sounds/done_vote.mp3` | Preload all on login; **no playback** until **Let's go!** (§8.8)                               |
+| Interactive login                | `sounds/vote_bgm.mp3`, `sounds/champion.mp3`, `sounds/done_vote.mp3`, `sounds/drum_roll.mp3` | Preload all on login; **no playback** until **Let's go!** (§8.8)                               |
 | Interactive voting screen (§8.8) | `sounds/vote_bgm.mp3`                                                | Loop until voting done (§8.8) or logout                                                        |
 | Voting complete (§8.8)           | `sounds/done_vote.mp3`                                               | Stop `vote_bgm.mp3`; play **once** when done button appears                                    |
-| Winner announcement open (§8.9) | `sounds/champion.mp3`                        | Fade out `vote_bgm.mp3` over 1s; then open overlay and loop `champion.mp3` until overlay closed |
-| Winner announcement closed       | —                     | Stop `champion.mp3` only; do **not** resume `vote_bgm.mp3`                                      |
+| Winner announcement suspense (§8.9) | `sounds/drum_roll.mp3`                                            | Fade out `vote_bgm.mp3` over 1s; open overlay; play **once** when bar animation starts         |
+| Winner caption reveal (§8.9)     | `sounds/champion.mp3`                                                | After **2.5 s** hold on settled leaderboard, loop until overlay closed                         |
+| Winner announcement closed       | —                     | Stop `champion.mp3` and `drum_roll.mp3`; do **not** resume `vote_bgm.mp3`                      |
 
 
-Use HTML5 `Audio` with `loop: true` for BGM and `preload: auto`. On Interactive login, call `preloadInteractiveSounds()` to buffer `vote_bgm.mp3`, `champion.mp3`, and `done_vote.mp3` **without playing**. Reuse cached `Audio` elements for `startVoteBgm()` (on **Let's go!**, §8.8), `playDoneVoteSound()` (voting complete, §8.8), and `startChampionBgm()` (§8.9). Release cached elements on Interactive logout; stop champion and done_vote audio on overlay close / logout.
+Use HTML5 `Audio` with `loop: true` for BGM and `preload: auto`. On Interactive login, call `preloadInteractiveSounds()` to buffer `vote_bgm.mp3`, `champion.mp3`, `done_vote.mp3`, and `drum_roll.mp3` **without playing**. Reuse cached `Audio` elements for `startVoteBgm()` (on **Let's go!**, §8.8), `playDoneVoteSound()` (voting complete, §8.8), `playDrumRollSound()` (suspense leaderboard, §8.9), and `startChampionBgm()` (winner caption, §8.9). Release cached elements on Interactive logout; stop champion, drum_roll, and done_vote audio on overlay close / logout.
 
 ---
 
