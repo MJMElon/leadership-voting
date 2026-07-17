@@ -22,6 +22,14 @@
     return [...LV.TEAMS].sort((a, b) => (LV.votes[b.id] || 0) - (LV.votes[a.id] || 0));
   };
 
+  LV.getWinners = function () {
+    const ranks = LV.getRanks();
+    if (!ranks.length) return [];
+    const topScore = LV.votes[ranks[0].id] || 0;
+    if (topScore === 0) return [];
+    return ranks.filter(team => (LV.votes[team.id] || 0) === topScore);
+  };
+
   LV.isVotingComplete = function () {
     if (!Array.isArray(LV.TEAMS) || !LV.TEAMS.length) return false;
 

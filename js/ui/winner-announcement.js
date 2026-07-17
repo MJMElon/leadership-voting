@@ -19,6 +19,17 @@
     return Math.round(value).toLocaleString();
   }
 
+  function formatWinnerTeams(teams) {
+    const labels = teams.map(team => team.emoji + ' Team ' + team.id);
+    if (labels.length <= 1) return labels[0] || '';
+    if (labels.length === 2) return labels.join(' & ');
+    return labels.slice(0, -1).join(', ') + ' & ' + labels[labels.length - 1];
+  }
+
+  function getWinnerIds(winners) {
+    return new Set(winners.map(team => team.id));
+  }
+
   function getLeaderboardMaxMark(targets) {
     const actualMax = Math.max(0, ...targets);
     return Math.max(1000, Math.ceil(actualMax / 1000) * 1000);
@@ -43,21 +54,43 @@
     const suspense = document.getElementById('winner-suspense');
     const caption = document.getElementById('winner-caption');
     const chart = document.getElementById('winner-lb-chart');
+    const title = document.getElementById('winner-suspense-title');
+    const stage = document.getElementById('winner-reveal-stage');
     if (suspense) suspense.classList.add('is-hidden');
-    if (caption) caption.classList.add('is-hidden');
+    if (title) title.classList.remove('is-hidden');
+    if (caption) {
+      caption.classList.add('is-hidden');
+      caption.classList.remove('is-overlay-reveal', 'is-at-top');
+    }
+    if (stage) {
+      stage.classList.remove('is-revealing');
+      stage.style.removeProperty('--winner-overlay-reveal-ms');
+    }
     if (chart) chart.innerHTML = '';
+    const teamEl = document.getElementById('winner-team-label');
+    if (teamEl) teamEl.classList.remove('is-tie');
   }
 
   function createSweepers(teams, maxScore) {
     return teams.map(team => {
-      const phase = Math.random() * Math.PI * 2;
-      const startMark = (maxScore / 2) + Math.sin(phase) * (maxScore / 2);
+      const startMark = maxScore * (0.25 + Math.random() * 0.5);
       return {
         team,
         target: LV.votes[team.id] || 0,
-        phase,
-        speed: 0.0035 + Math.random() * 0.0025,
+        phaseA: Math.random() * Math.PI * 2,
+        phaseB: Math.random() * Math.PI * 2,
+        phaseC: Math.random() * Math.PI * 2,
+        driftPhase: Math.random() * Math.PI * 2,
+        speedA: 0.003 + Math.random() * 0.005,
+        speedB: 0.004 + Math.random() * 0.006,
+        speedC: 0.002 + Math.random() * 0.004,
+        driftSpeed: 0.0008 + Math.random() * 0.0015,
+        ampA: 0.18 + Math.random() * 0.22,
+        ampB: 0.12 + Math.random() * 0.18,
+        ampC: 0.08 + Math.random() * 0.14,
+        centerRatio: 0.28 + Math.random() * 0.44,
         display: startMark,
+        settleStart: null,
       };
     });
   }
@@ -87,13 +120,13 @@
     if (val) val.textContent = formatMarks(score);
   }
 
-  function easeOutCubic(t) {
-    return 1 - Math.pow(1 - t, 3);
+  function easeOutQuart(t) {
+    return 1 - Math.pow(1 - t, 4);
   }
 
-  function runSuspenseAnimation(sweepers, maxScore, winnerId, onComplete) {
+  function runSuspenseAnimation(sweepers, maxScore, winnerIds, onComplete) {
     const duration = LV.WINNER_SUSPENSE_MS || 6500;
-    const settleStart = 0.72;
+    const chaosEnd = 0.8;
     const start = performance.now();
     let lastNow = start;
 
@@ -102,22 +135,37 @@
       const progress = Math.min(elapsed / duration, 1);
       const dt = Math.min(now - lastNow, 48);
       lastNow = now;
-      const speedFactor = Math.pow(1 - progress, 1.6);
-      const drift = Math.min(progress / settleStart, 1);
 
       sweepers.forEach(s => {
         let score;
 
-        if (progress < settleStart) {
-          s.phase += s.speed * dt * (0.45 + speedFactor * 3.2);
-          const amplitude = (maxScore / 2) * Math.pow(1 - progress / settleStart, 0.55);
-          const center = (maxScore / 2) * (1 - drift) + s.target * drift;
-          score = center + Math.sin(s.phase) * amplitude;
-          score = Math.max(0, Math.min(maxScore, score));
+        if (progress < chaosEnd) {
+          const chaosProgress = progress / chaosEnd;
+          const speedMul = 0.55 + (1 - chaosProgress) * 2.4;
+
+          s.phaseA += s.speedA * dt * speedMul;
+          s.phaseB += s.speedB * dt * speedMul * 1.3;
+          s.phaseC += s.speedC * dt * speedMul * 0.85;
+          s.driftPhase += s.driftSpeed * dt;
+
+          const center = maxScore * (
+            s.centerRatio +
+            Math.sin(s.driftPhase) * 0.14 +
+            Math.sin(chaosProgress * Math.PI * 2.3 + s.phaseA) * 0.08
+          );
+
+          const wave =
+            Math.sin(s.phaseA) * maxScore * s.ampA +
+            Math.sin(s.phaseB * 1.41 + 1.2) * maxScore * s.ampB +
+            Math.sin(s.phaseC * 0.67) * maxScore * s.ampC;
+
+          score = center + wave;
+          score = Math.max(maxScore * 0.04, Math.min(maxScore * 0.99, score));
           s.display = score;
         } else {
-          const settleT = easeOutCubic((progress - settleStart) / (1 - settleStart));
-          score = s.display + (s.target - s.display) * Math.min(settleT * 0.22 + 0.04, 1);
+          if (s.settleStart == null) s.settleStart = s.display;
+          const settleT = easeOutQuart((progress - chaosEnd) / (1 - chaosEnd));
+          score = s.settleStart + (s.target - s.settleStart) * settleT;
           s.display = score;
         }
 
@@ -134,7 +182,7 @@
         const col = document.querySelector('.winner-lb-col[data-team-id="' + s.team.id + '"]');
         if (col) {
           col.classList.add('is-settled');
-          if (s.team.id === winnerId) col.classList.add('is-winner');
+          if (winnerIds.has(s.team.id)) col.classList.add('is-winner');
         }
       });
 
@@ -145,22 +193,48 @@
     suspenseRaf = requestAnimationFrame(frame);
   }
 
-  function revealWinnerCaption(top) {
-    const suspense = document.getElementById('winner-suspense');
+  function revealWinnerCaption(winners) {
+    const title = document.getElementById('winner-suspense-title');
     const caption = document.getElementById('winner-caption');
+    const stage = document.getElementById('winner-reveal-stage');
     const teamEl = document.getElementById('winner-team-label');
-    if (suspense) suspense.classList.add('is-hidden');
-    if (caption) caption.classList.remove('is-hidden');
-    if (teamEl) teamEl.textContent = top.emoji + ' Team ' + top.id;
+    const revealMs = LV.WINNER_OVERLAY_REVEAL_MS || 5000;
+
+    if (title) title.classList.add('is-hidden');
+    if (teamEl) {
+      teamEl.textContent = formatWinnerTeams(winners);
+      teamEl.classList.toggle('is-tie', winners.length > 1);
+    }
+    if (caption) {
+      caption.classList.remove('is-hidden', 'is-at-top');
+      void caption.offsetWidth;
+      caption.classList.add('is-overlay-reveal');
+    }
+    if (stage) {
+      stage.style.setProperty('--winner-overlay-reveal-ms', revealMs + 'ms');
+      stage.classList.add('is-revealing');
+    }
+
     spawnCartoonElements(document.getElementById('winner-cartoon-layer'));
     LV.startChampionBgm();
-    LV.launchConfetti(top.color);
+    winners.forEach((team, i) => {
+      setTimeout(() => LV.launchConfetti(team.color), i * 350);
+    });
+
+    captionRevealTimer = setTimeout(function () {
+      if (caption) {
+        caption.classList.remove('is-overlay-reveal');
+        caption.classList.add('is-at-top');
+      }
+      if (stage) stage.classList.remove('is-revealing');
+      captionRevealTimer = null;
+    }, revealMs);
   }
 
   LV.openWinnerAnnouncement = async function () {
     if (!LV.isInteractive()) return;
-    const top = LV.getRanks()[0];
-    if (!top || LV.votes[top.id] === 0) return;
+    const winners = LV.getWinners();
+    if (!winners.length) return;
 
     const overlay = document.getElementById('winner-announcement');
     const suspense = document.getElementById('winner-suspense');
@@ -190,8 +264,8 @@
     LV.renderVotingUI();
     LV.playDrumRollSound();
 
-    runSuspenseAnimation(sweepers, maxScore, top.id, function () {
-      revealWinnerCaption(top);
+    runSuspenseAnimation(sweepers, maxScore, getWinnerIds(winners), function () {
+      revealWinnerCaption(winners);
     });
   };
 

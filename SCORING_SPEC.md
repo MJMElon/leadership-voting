@@ -174,7 +174,7 @@ No separate bonus layer — Mentor and Pain Point Marks scores are regular vote 
 ### 3.6 Ranking
 
 - Teams ranked by `team_total`, descending (used internally for winner announcement).
-- `getRanks()[0]` returns the current #1 team when any team has points > 0.
+- `getWinners()` returns all teams tied for the highest score when any team has points > 0; `getRanks()[0]` is the first of those teams.
 
 ---
 
@@ -799,7 +799,7 @@ Shown only for `interactive` keyword login (§4.6). Replaces the main voting/sco
 
 ### 8.9 Winner announcement (Interactive only)
 
-Full-screen overlay opened from the **"Voting is done! And the winner is..."** button (`#voting-done-btn`, §8.8). Uses current **#1 team** from vote totals (`getRanks()[0]`).
+Full-screen overlay opened from the **"Voting is done! And the winner is..."** button (`#voting-done-btn`, §8.8). Uses `getWinners()` — all teams tied for the highest vote total.
 
 **Two-phase reveal:**
 
@@ -838,19 +838,19 @@ Full-screen overlay opened from the **"Voting is done! And the winner is..."** b
 └────────────────────────────────────────────┘
 ```
 
-**Caption** (exact copy, `{N}` = winning team number 1–4):
+**Caption** (exact copy; team line lists one winner or all tied winners joined with `, ` / ` & `, e.g. `🔥 Team 1 & ⚡ Team 2`):
 
 ```
 Congratulations to
-Team {N}
+Team {N}   (or tied: 🔥 Team 1 & ⚡ Team 2)
 For winning today's keynote day!
 ```
 
 **Behavior:**
 
 - **Open:** tap **"Voting is done! And the winner is..."** (§8.8) while Interactive; **fade out** `vote_bgm.mp3` over **1 second** (`VOTE_BGM_FADE_MS`) if still playing; then set `event_state.winner_announced = true` (locks all vote/score undo and submit on every client), open overlay, show suspense leaderboard, and play `sounds/drum_roll.mp3` once (§10).
-- **Suspense animation:** each team bar **starts at a random mark** (random sine phase). Bars then **sweep the full chart range** (0 → max) up and down via sine oscillation; sweep speed and amplitude ramp down over **5.3 s** while the oscillation center drifts toward each team's final total; bars lock on final marks, then winning team column gets `.is-winner` glow.
-- **Caption reveal:** after suspense completes, hold the settled leaderboard for **2.5 s**, then hide leaderboard, show winner caption, start looping `champion.mp3`, confetti, and floating cartoon elements.
+- **Suspense animation:** each team bar **starts at a random mark** (random sine phase). Bars then **sweep the full chart range** (0 → max) up and down via sine oscillation; sweep speed and amplitude ramp down over **5.3 s** while the oscillation center drifts toward each team's final total; bars lock on final marks; all tied-winning team columns get `.is-winner` glow.
+- **Caption reveal:** after suspense completes, hold the settled leaderboard for **2.5 s**, then hide leaderboard, show winner caption with **all tied winners' names** in the headline (emoji + team number per team), start looping `champion.mp3`, confetti (each winner's team color), and floating cartoon elements.
 - **Close:** ✕ control or tap backdrop; set `event_state.winner_announced = false`; stops `champion.mp3` and any playing `drum_roll.mp3`; `vote_bgm.mp3` does **not** resume; undo and re-vote/re-key allowed again.
 - **Audio:** `drum_roll.mp3` once during suspense; `champion.mp3` loops only after winner caption appears (§10).
 - **Motion:** CSS/keyframe celebration background (gradient shimmer); Phase 2 adds confetti and cartoon elements (stars ⭐, balloons 🎈, party poppers 🎉) — align with §7 Cartoon Game Leaderboard.
