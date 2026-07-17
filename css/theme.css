@@ -124,4 +124,22 @@ body::before {
 @media (max-width: 600px) {
   .chart-bars { height: 220px !important; }
   .vote-grid { grid-template-columns: 1fr !important; }
+
+  #main-app .page-header {
+    padding: 0.35rem 0.75rem 0.5rem;
+  }
+
+  #main-app .page-header h1 {
+    font-size: clamp(0.78rem, 3.4vw, 1rem);
+    line-height: 1.25;
+  }
+
+  #main-app .user-bar {
+    margin-bottom: 0.65rem;
+  }
+
+  .vote-section,
+  .role-score-section {
+    margin-top: 0;
+  }
 }

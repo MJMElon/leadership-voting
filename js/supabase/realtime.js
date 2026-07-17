@@ -93,13 +93,6 @@
         const tid = LV.TEAMS.find(t => t.name === v.to)?.id;
         if (tid != null) LV.setMyRoleScore(tid, v.pts);
       });
-      const ppVote = LV.voteLog.find(v => v.email === LV.currentUser.email && v.from === 'Pain Point Marks');
-      if (ppVote) {
-        const target = LV.TEAMS.find(t => t.name === ppVote.to);
-        LV.setMyPainPointVote(target ? { teamId: target.id, confirmed: true } : null);
-      } else {
-        LV.setMyPainPointVote(null);
-      }
     }
   }
 

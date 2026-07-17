@@ -8,6 +8,15 @@
   display: none !important;
 }
 
+#main-app:not(.interactive-mode) #interactive-display {
+  display: none !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
 .interactive-display {
   display: none;
   flex: 1;
@@ -279,7 +288,7 @@
   color: var(--ink);
   margin: 0;
   line-height: 1.25;
-  max-width: 28ch;
+  max-width: 40ch;
   text-shadow: 0 2px 0 rgba(255, 255, 255, .6);
 }
 

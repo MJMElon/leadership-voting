@@ -45,9 +45,7 @@
     );
     const mentorDone = LV.TEAMS.every(t => mentorScoredTeams.has(t.id));
 
-    const painPointDone = LV.voteLog.some(v => v.from === 'Pain Point Marks');
-
-    return teamVotesDone && mentorDone && painPointDone;
+    return teamVotesDone && mentorDone;
   };
 
   LV.buildSlotFromKey = function (slotKey) {

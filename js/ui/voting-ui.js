@@ -1,9 +1,7 @@
 (function (LV) {
   let pendingVoteTeamId = null;
-  let pendingConfirmMode = null;
 
   const MENTOR_FROM = 'Mentor';
-  const PAIN_POINT_FROM = 'Pain Point Marks';
 
   function hideVotingSections(section, roleSection) {
     if (section) section.style.display = 'none';
@@ -51,7 +49,7 @@
     const pts = opts.points ?? LV.TEAM_VOTE_PTS;
     const instructionEl = opts.instructionEl || document.getElementById('vote-instruction');
     const undoWrapId = opts.undoWrapId || 'vote-undo-wrap';
-    const onTap = opts.onTap || ((t) => openConfirmDialog(t, 'team'));
+    const onTap = opts.onTap || ((t) => openConfirmDialog(t));
     const onUndo = opts.onUndo || undoTeamVote;
     const voteLabel = opts.voteLabel || 'Voted';
 
@@ -120,21 +118,17 @@
     }
   }
 
-  function openConfirmDialog(team, mode) {
+  function openConfirmDialog(team) {
     if (votingLocked()) {
       LV.showToast('Voting is locked while the winner announcement is displayed.', true);
       return;
     }
     pendingVoteTeamId = team.id;
-    pendingConfirmMode = mode;
     LV.setConfirmDialogOpen(true);
 
-    const pts = mode === 'painPoint' ? LV.PAIN_POINT_VOTE_PTS : LV.TEAM_VOTE_PTS;
-    document.getElementById('confirm-modal-title').textContent =
-      mode === 'painPoint' ? '📌 Confirm Pain Point Vote' : '🗳️ Confirm Your Vote';
+    document.getElementById('confirm-modal-title').textContent = '🗳️ Confirm Your Vote';
     document.getElementById('confirm-modal-message').innerHTML =
-      (mode === 'painPoint' ? 'Cast your Pain Point vote' : 'Cast your vote') +
-      ' (<span id="confirm-points-label">' + pts.toLocaleString() + '</span> marks) to:';
+      'Cast your vote (<span id="confirm-points-label">' + LV.TEAM_VOTE_PTS.toLocaleString() + '</span> marks) to:';
     document.getElementById('confirm-team-label').textContent = team.emoji + ' ' + team.name;
     document.getElementById('vote-confirm-modal').classList.add('open');
   }
@@ -142,7 +136,6 @@
   LV.closeConfirmDialog = function () {
     LV.setConfirmDialogOpen(false);
     pendingVoteTeamId = null;
-    pendingConfirmMode = null;
     document.getElementById('vote-confirm-modal').classList.remove('open');
   };
 
@@ -177,9 +170,6 @@
   }
 
   LV.confirmVote = async function () {
-    if (pendingConfirmMode === 'painPoint') {
-      return confirmPainPointVote();
-    }
     return LV.confirmTeamVote();
   };
 
@@ -225,66 +215,8 @@
     }
   };
 
-  async function confirmPainPointVote() {
-    const teamId = pendingVoteTeamId;
-    if (!teamId || LV.myPainPointVote?.confirmed || votingLocked()) return;
-    LV.closeConfirmDialog();
-
-    const team = LV.TEAMS.find(t => t.id === teamId);
-    const card = document.querySelector('#pain-point-grid .vote-card:not(.is-locked)');
-
-    const result = await LV.dbSavePainPointVote(teamId);
-    if (!result.ok) {
-      LV.showToast('Failed to save Pain Point vote. Try again.', true);
-      return;
-    }
-    if (result.id != null) LV.ourVoteIds.add(result.id);
-
-    LV.setMyPainPointVote({ teamId, confirmed: true });
-    LV.votes[teamId] = (LV.votes[teamId] || 0) + LV.PAIN_POINT_VOTE_PTS;
-    LV.voteLog.unshift({
-      id: result.id, voter: LV.currentUser.name, email: LV.currentUser.email,
-      from: PAIN_POINT_FROM, to: team.name,
-      pts: LV.PAIN_POINT_VOTE_PTS, time: new Date().toLocaleTimeString(),
-    });
-
-    LV.playWhoosh();
-    const afterVote = () => {
-      LV.playCoin();
-      refreshAfterVote();
-      LV.showToast('Pain Point vote — ' + LV.PAIN_POINT_VOTE_PTS.toLocaleString() + ' marks → ' + team.name + '!');
-    };
-
-    if (card) {
-      const rect = card.getBoundingClientRect();
-      LV.animStarBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, team.color, afterVote);
-    } else {
-      afterVote();
-    }
-  }
-
-  async function undoPainPointVote() {
-    if (!LV.myPainPointVote?.confirmed || votingLocked()) return;
-
-    const votedTeamId = LV.myPainPointVote.teamId;
-
-    const result = await LV.dbUndoPainPointVote();
-    if (!result.ok) {
-      LV.showToast('Failed to undo vote. Try again.', true);
-      return;
-    }
-
-    LV.setMyPainPointVote(null);
-    LV.votes[votedTeamId] = Math.max(0, (LV.votes[votedTeamId] || 0) - LV.PAIN_POINT_VOTE_PTS);
-    removeVoteLogEntry(LV.currentUser.email, PAIN_POINT_FROM);
-
-    refreshAfterVote();
-    LV.showToast('Pain Point vote cleared — tap a team to vote again');
-  }
-
   function renderMentorPanel() {
     renderRoleScoreInputs();
-    renderPainPointVoteCards();
   }
 
   function renderRoleScoreInputs() {
@@ -294,7 +226,7 @@
     document.getElementById('role-score-title').textContent = '🎓 Mentor Scoring';
     document.getElementById('role-score-hint').textContent = locked
       ? 'Scoring is locked while the winner announcement is displayed.'
-      : 'Enter 0–3,000 marks per team and submit. Submitted rows lock — tap Undo to change a score.';
+      : 'Enter 0–8,000 marks per team and submit. Submitted rows lock — tap Undo to change a score.';
 
     const grid = document.getElementById('role-score-grid');
     grid.innerHTML = '';
@@ -346,23 +278,6 @@
           submitRoleScore(parseInt(inp.dataset.teamId, 10), fromTeam);
         }
       });
-    });
-  }
-
-  function renderPainPointVoteCards() {
-    const grid = document.getElementById('pain-point-grid');
-    if (!grid) return;
-
-    renderTeamVoteCards(grid, {
-      hasVoted: LV.myPainPointVote?.confirmed,
-      votedTeamId: LV.myPainPointVote?.teamId,
-      points: LV.PAIN_POINT_VOTE_PTS,
-      instructionEl: document.getElementById('pain-point-instruction'),
-      undoWrapId: 'pain-point-undo-wrap',
-      onTap: (t) => openConfirmDialog(t, 'painPoint'),
-      onUndo: undoPainPointVote,
-      voteLabel: 'Pain Point vote',
-      emptyInstruction: 'Tap the team to award your Pain Point vote — one vote worth 1,000 marks.',
     });
   }
 

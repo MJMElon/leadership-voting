@@ -11,7 +11,6 @@
     return LV.currentUser?.slot?.roleId === 'mentor';
   };
 
-  const PAIN_POINT_FROM = 'Pain Point Marks';
   const MENTOR_FROM = 'Mentor';
 
   function restoreMyVotes(user) {
@@ -31,11 +30,6 @@
         const tid = LV.TEAMS.find(t => t.name === v.to)?.id;
         if (tid != null) LV.setMyRoleScore(tid, v.pts);
       });
-      const ppVote = LV.voteLog.find(v => v.email === user.email && v.from === PAIN_POINT_FROM);
-      if (ppVote) {
-        const target = LV.TEAMS.find(t => t.name === ppVote.to);
-        if (target) LV.setMyPainPointVote({ teamId: target.id, confirmed: true });
-      }
     }
   }
 
@@ -46,8 +40,8 @@
     });
     if (blocked) return false;
 
-    const ownsBoth = LV.MENTOR_SLOT_KEYS.every(k => LV.takenSlots[k] === email);
-    if (ownsBoth) return true;
+    const ownsSlot = LV.MENTOR_SLOT_KEYS.every(k => LV.takenSlots[k] === email);
+    if (ownsSlot) return true;
 
     return LV.dbLockMentorSlots(email, name);
   }
@@ -57,7 +51,7 @@
     const name = 'Mentor';
     const ok = await ensureMentorSlots(email, name);
     if (!ok) {
-      LV.showToast('Mentor slots already claimed by another user.', true);
+      LV.showToast('Mentor slot already claimed by another user.', true);
       return false;
     }
     await LV.finishLogin({
@@ -160,6 +154,7 @@
   LV.finishLogin = async function (user) {
     LV.setCurrentUser(user);
     LV.resetUserVoteState();
+    LV.setInteractiveMode(!!user.isInteractive);
 
     document.getElementById('auth-screen').style.display = 'none';
     const mainApp = document.getElementById('main-app');
@@ -202,8 +197,6 @@
       LV.renderInteractiveDisplay();
       return;
     }
-
-    LV.setInteractiveMode(false);
   };
 
   LV.logout = function () {

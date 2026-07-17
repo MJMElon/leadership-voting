@@ -7,7 +7,6 @@
   LV.roleScoreDrafts = {};
   LV.ourVoteIds = new Set();
   LV.myTeamVote = null;
-  LV.myPainPointVote = null;
   LV.myRoleScores = {};
   LV.lastInputAt = 0;
   LV.confirmDialogOpen = false;
@@ -25,7 +24,6 @@
 
   LV.resetUserVoteState = function () {
     LV.myTeamVote = null;
-    LV.myPainPointVote = null;
     LV.myRoleScores = {};
     Object.keys(LV.roleScoreDrafts).forEach(k => delete LV.roleScoreDrafts[k]);
   };
@@ -33,7 +31,6 @@
   LV.bumpInputTime = function () { LV.lastInputAt = Date.now(); };
   LV.setConfirmDialogOpen = function (open) { LV.confirmDialogOpen = open; };
   LV.setMyTeamVote = function (v) { LV.myTeamVote = v; };
-  LV.setMyPainPointVote = function (v) { LV.myPainPointVote = v; };
   LV.setMyRoleScore = function (teamId, pts) { LV.myRoleScores[teamId] = pts; };
   LV.clearMyRoleScore = function (teamId) { delete LV.myRoleScores[teamId]; };
 

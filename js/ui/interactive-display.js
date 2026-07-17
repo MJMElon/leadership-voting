@@ -120,7 +120,10 @@
     if (!mainApp) return;
 
     mainApp.classList.toggle('interactive-mode', !!enabled);
-    if (display) display.classList.toggle('is-visible', !!enabled);
+    if (display) {
+      display.classList.toggle('is-visible', !!enabled);
+      display.toggleAttribute('hidden', !enabled);
+    }
 
     if (!enabled) {
       deactivateReady(ready);

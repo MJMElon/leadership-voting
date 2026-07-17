@@ -7,7 +7,7 @@ create table if not exists sessions (
   name      text not null,
   locked_at timestamptz default now()
 );
--- Mentor login locks role:mentor + role:pain_point_marks under the same identifier.
+-- Mentor login locks role:mentor under the identifier "mentor".
 -- Uniqueness is enforced per slot_key (PK), not per email.
 
 -- Migration from earlier schema (if sessions_email_unique exists):

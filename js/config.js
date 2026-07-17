@@ -3,9 +3,8 @@
   LV.SUPABASE_KEY = 'sb_publishable_v3WGxtpxNGVZFjr8q_qwPA_bEns0BTQ';
   LV.USE_SUPABASE = true;
   LV.TEAM_VOTE_PTS = 1000;
-  LV.PAIN_POINT_VOTE_PTS = 1000;
   LV.MENTOR_MIN_PTS = 0;
-  LV.MENTOR_MAX_PTS = 3000;
+  LV.MENTOR_MAX_PTS = 8000;
   LV.FW_DURATION_MS = 8000;
   LV.POLL_MS = 2000;
   LV.VOTE_BGM_FADE_MS = 1000;
@@ -21,7 +20,7 @@
   LV.MENTOR_EMAIL = 'mentor';
 
   LV.TEAM_SLOT_KEYS = ['team:1', 'team:2', 'team:3', 'team:4'];
-  LV.MENTOR_SLOT_KEYS = ['role:mentor', 'role:pain_point_marks'];
+  LV.MENTOR_SLOT_KEYS = ['role:mentor'];
 
   LV.TEAMS = [
     { id: 1, name: 'Team 1', emoji: '🔥', color: '#f59e0b' },
@@ -32,12 +31,11 @@
 
   LV.ROLES = [
     { id: 'mentor', name: 'Mentor', fromTeam: 'Mentor' },
-    { id: 'pain_point_marks', name: 'Pain Point Marks', fromTeam: 'Pain Point Marks' },
   ];
 
   LV.SLOT_KEYS = [
     'team:1', 'team:2', 'team:3', 'team:4',
-    'role:mentor', 'role:pain_point_marks',
+    'role:mentor',
   ];
 
   LV.MEDALS = ['🥇', '🥈', '🥉', '4️⃣'];
@@ -60,6 +58,6 @@
     const parsed = LV.parseSlotKey(slotKey);
     if (!parsed) return { label: slotKey, emoji: '' };
     if (parsed.type === 'team') return { label: parsed.team.name, emoji: parsed.team.emoji };
-    return { label: parsed.role.name, emoji: parsed.roleId === 'mentor' ? '🎓' : '📌' };
+    return { label: parsed.role.name, emoji: '🎓' };
   };
 })(window.LV = window.LV || {});

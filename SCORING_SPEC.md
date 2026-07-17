@@ -8,7 +8,7 @@ Source of truth for rebuilding the voting/scoring system. Derived from `index.ht
 
 ## 1. Purpose
 
-A live, multi-device voting app for the **Project Farmer Keynote Day 2026-07-18** event. Four teams compete for total points. The login field accepts **email addresses** (team voters) or two reserved keywords — `interactive` and `mentor` — each with a distinct role (§4.1). After sign-in, email users claim exactly one team (Team 1–4) via the assignment picker (§4.2). The `mentor` keyword skips the picker and enters a combined UI: numeric Mentor scoring plus a single Pain Point tap-to-vote (§4.4, §8.5). Scoring behavior depends on assignment type (see §3). The entire UI uses the **Cartoon Game Leaderboard** theme (§7).
+A live, multi-device voting app for the **Project Farmer Keynote Day 2026-07-18** event. Four teams compete for total points. The login field accepts **email addresses** (team voters) or two reserved keywords — `interactive` and `mentor` — each with a distinct role (§4.1). After sign-in, email users claim exactly one team (Team 1–4) via the assignment picker (§4.2). The `mentor` keyword skips the picker and enters numeric Mentor scoring (§4.4, §8.5). Scoring behavior depends on assignment type (see §3). The entire UI uses the **Cartoon Game Leaderboard** theme (§7).
 
 ---
 
@@ -16,7 +16,7 @@ A live, multi-device voting app for the **Project Farmer Keynote Day 2026-07-18*
 
 ## 2. Assignment Options
 
-Each logged-in user claims assignment slot(s) as follows: **email users** pick exactly one team (`team:1`–`team:4`); `mentor` keyword login claims both role slots (`role:mentor` and `role:pain_point_marks`) under one identifier. Once claimed, a slot is locked to that user's email/identifier; no other user may select it.
+Each logged-in user claims exactly one assignment slot: **email users** pick one team (`team:1`–`team:4`); `mentor` keyword login claims the `role:mentor` slot under identifier `mentor`. Once claimed, a slot is locked to that user's email/identifier; no other user may select it.
 
 ### 2.1 Teams (4 options)
 
@@ -33,22 +33,21 @@ Configurable constant `TEAMS` — 4 teams, each with `id`, `name`, `emoji`, `col
 
 Team slots are for **team representatives** who cast one fixed-value vote for their chosen best team (§3.1).
 
-### 2.2 Roles (2 options)
+### 2.2 Roles (1 option)
 
 
-| ID                 | Name             | How to enter                                                                          |
-| ------------------ | ---------------- | ------------------------------------------------------------------------------------- |
-| `mentor`           | Mentor           | Login keyword `mentor` (§4.1, §4.4) — numeric scoring + Pain Point tap-to-vote (§8.5) |
-| `pain_point_marks` | Pain Point Marks | Same `mentor` login — single tap-to-vote for one team (§3.3, §8.5)                    |
+| ID       | Name   | How to enter                                                         |
+| -------- | ------ | -------------------------------------------------------------------- |
+| `mentor` | Mentor | Login keyword `mentor` (§4.1, §4.4) — numeric scoring for all teams (§8.5) |
 
 
 Configurable constant `ROLES` — each with `id`, `name`.
 
-Role slots: **Mentor** scores all four teams with numeric entry (§3.2); **Pain Point Marks** is a single tap-to-vote for one team (§3.3).
+Role slot: **Mentor** scores all four teams with numeric entry (§3.2).
 
 ### 2.3 Slot keys (unified identifier)
 
-All six options share one locking namespace. Use stable slot keys in the DB and client:
+All five options share one locking namespace. Use stable slot keys in the DB and client:
 
 
 | Slot key                | Display name     | Type |
@@ -57,11 +56,10 @@ All six options share one locking namespace. Use stable slot keys in the DB and 
 | `team:2`                | Team 2           | team |
 | `team:3`                | Team 3           | team |
 | `team:4`                | Team 4           | team |
-| `role:mentor`           | Mentor           | role |
-| `role:pain_point_marks` | Pain Point Marks | role |
+| `role:mentor` | Mentor | role |
 
 
-**Total: 6 slot keys** — email users choose one team; `mentor` keyword holds both role slots; no duplicates across users.
+**Total: 5 slot keys** — email users choose one team; `mentor` keyword holds the Mentor role slot; no duplicates across users.
 
 ---
 
@@ -103,15 +101,15 @@ Tap team card (not own team)
 
 After voting, show which team received the vote. Other team cards are inactive until **Undo**. While the winner announcement is displayed, all cards and **Undo** are disabled.
 
-### 3.2 Mentor — score all four teams (0–3,000 each)
+### 3.2 Mentor — score all four teams (0–8,000 each)
 
-Applies when the logged-in user holds the `role:mentor` slot (`mentor` keyword login, §4.4). Scores are entered via **numeric rows** in the consolidated Mentor panel (§8.5).
+Applies when the logged-in user holds the `role:mentor` slot (`mentor` keyword login, §4.4). Scores are entered via **numeric rows** in the Mentor panel (§8.5).
 
 
 | Rule           | Detail                                                                                                                                              |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Targets        | All **4 teams**                                                                                                                                     |
-| Per-team range | **Minimum 0**, **maximum 3,000** marks each                                                                                                         |
+| Per-team range | **Minimum 0**, **maximum 8,000** marks each                                                                                                         |
 | Input          | Numeric score entry per team (four inputs)                                                                                                          |
 | Submission     | User enters a score for a chosen team and taps **Submit** on that row                                                                               |
 | After submit   | Input **locks**; row button changes from **Submit** to **Undo**                                                                                     |
@@ -122,56 +120,22 @@ Applies when the logged-in user holds the `role:mentor` slot (`mentor` keyword l
 
 Mentor may assign 0 to any team (e.g. skip a team without scoring it).
 
-### 3.3 Pain Point Marks — single tap vote (fixed 1,000 marks)
 
-Applies when the logged-in user entered via the `mentor` keyword (§4.4) and casts their Pain Point Marks vote from the **consolidated Mentor panel** (§8.5). There is no separate Pain Point Marks login or assignment picker option. Behavior mirrors team-rep tap-to-vote (§3.1), except the Mentor may choose **any** of the four teams (no "own team" restriction).
-
-
-| Rule           | Detail                                                                                                                                   |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Votes allowed  | **Exactly one active vote** per Mentor user, for **one** team                                                                            |
-| Targets        | Any **1** of the 4 teams                                                                                                                 |
-| Points awarded | **Fixed 1,000 marks** — no score entry, no variable amount                                                                               |
-| Interaction    | **Tap-to-vote** — Mentor taps the team card to award the Pain Point vote                                                                 |
-| Confirmation   | After tap, a **confirmation dialog** asks whether to cast the Pain Point vote (1,000 marks) to that team                                 |
-| On confirm     | Insert vote row (`points = 1000`, `from_team = 'Pain Point Marks'`); UI locks other cards; show voted state                              |
-| Undo           | Tap **Undo Vote** → delete vote row; unlock all team cards; Mentor may tap a different team and confirm again                            |
-| Re-vote        | After undo, user may vote for any team (same confirm flow)                                                                               |
-| Lock           | **Undo and re-vote disabled** while the **Winner announcement** overlay is displayed (§8.9) — synced via `event_state.winner_announced` |
-| On cancel      | Close dialog; no vote cast; user may tap a different team                                                                                |
+| Assignment | Teams scored | Points per submission | Max submissions             | Input style                   |
+| ---------- | ------------ | --------------------- | --------------------------- | ----------------------------- |
+| Team 1–4   | 1 (not self) | Fixed 1,000           | 1 active (undo to change)   | Tap + confirm dialog + undo   |
+| Mentor     | All 4        | 0–8,000 each          | 1 per team (undo to change) | Numeric entry per team (§8.5) |
 
 
-**Flow:**
-
-```
-Tap team card (any of 4 teams)
-  → Confirmation dialog: "Cast your Pain Point vote (1,000 marks) to [Team X]?"
-  → Confirm → save vote, lock other cards, show voted state + Undo
-  → Undo   → delete vote, unlock cards for a new choice
-  → Cancel → return to team cards, no change
-```
-
-Mentor numeric scoring (§3.2) and Pain Point tap-to-vote are **independent** — the Mentor may submit 0–3,000 marks per team via numeric entry while also holding at most one active Pain Point vote.
-
-
-| Assignment       | Teams scored | Points per submission | Max submissions             | Input style                        |
-| ---------------- | ------------ | --------------------- | --------------------------- | ---------------------------------- |
-| Team 1–4         | 1 (not self) | Fixed 1,000           | 1 active (undo to change)   | Tap + confirm dialog + undo        |
-| Mentor           | All 4        | 0–3,000 each          | 1 per team (undo to change) | Numeric entry per team (§8.5)      |
-| Pain Point Marks | 1 (any team) | Fixed 1,000           | 1 active (undo to change)   | Tap + confirm dialog + undo (§8.5) |
-
-
-
-
-### 3.5 Total score formula
+### 3.3 Total score formula
 
 ```
 team_total[team_id] = sum(all vote rows where to_team_id = team_id)
 ```
 
-No separate bonus layer — Mentor and Pain Point Marks scores are regular vote rows distinguished by `from_team` (role label).
+No separate bonus layer — Mentor scores are regular vote rows distinguished by `from_team` (role label).
 
-### 3.6 Ranking
+### 3.4 Ranking
 
 - Teams ranked by `team_total`, descending (used internally for winner announcement).
 - `getWinners()` returns all teams tied for the highest score when any team has points > 0; `getRanks()[0]` is the first of those teams.
@@ -191,8 +155,8 @@ The auth screen has a single text field (labeled for email) and **Continue**. In
 
 | Input             | Detection                                      | Result                                                                                                                                          |
 | ----------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `interactive`     | Exact match, case-insensitive; no `@` required | **Interactive** mode (§4.6) — skip assignment picker                                                                                            |
-| `mentor`          | Exact match, case-insensitive; no `@` required | **Mentor** mode (§4.4) — skip assignment picker; claim or restore `role:mentor` **and** `role:pain_point_marks`; consolidated scoring UI (§8.5) |
+| `interactive`     | Exact match, case-insensitive; no `@` required | **Interactive** mode (§4.5) — skip assignment picker                                                                                            |
+| `mentor`          | Exact match, case-insensitive; no `@` required | **Mentor** mode (§4.4) — skip assignment picker; claim or restore `role:mentor`; Mentor scoring UI (§8.5) |
 | **Email address** | Contains `@` (validated on Continue)           | **Team voter** — show assignment picker (§4.2); **Team 1–4 only**                                                                               |
 | Anything else     | No `@` and not a reserved keyword              | Toast error: enter a valid email address                                                                                                        |
 
@@ -231,7 +195,7 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 **Rules:**
 
 1. User selects **one** team button.
-2. **No role section** — Mentor and Pain Point Marks are entered via the `mentor` login keyword (§4.1, §4.4), not this dialog.
+2. **No role section** — Mentor is entered via the `mentor` login keyword (§4.1, §4.4), not this dialog.
 3. On claim success → close dialog, enter main app with that assignment.
 4. On claim failure (race) → refresh dialog, show slot as taken, toast error.
 5. **Locked slots:** disabled button; show 🔒 and the **claimer's email** displayed directly under the option label (in the dialog).
@@ -244,8 +208,8 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 
 **Returning** `mentor` **keyword users:**
 
-- If identifier `mentor` matches active `sessions` rows for **both** `role:mentor` and `role:pain_point_marks` → auto-login as Mentor; **do not** show the dialog.
-- If either role slot is held by another identifier → toast error; remain on auth screen.
+- If identifier `mentor` matches active `sessions` row for `role:mentor` → auto-login as Mentor; **do not** show the dialog.
+- If the Mentor slot is held by another identifier → toast error; remain on auth screen.
 
 **Logout** does **not** release the slot; the same email (or `mentor` identifier) can return to the same assignment.
 
@@ -259,29 +223,19 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 
 
 
-### 4.4 Mentor (role slots, keyword login)
+### 4.4 Mentor (role slot, keyword login)
 
 - Entered by typing `mentor` in the login field and tapping **Continue** (§4.1). **No assignment picker** and **no** `@` validation for this exact string.
-- On first login: claim **both** `role:mentor` and `role:pain_point_marks` in `sessions` with identifier `mentor` and display name "Mentor".
-- On return: restore both role slots if still owned by `mentor`; same race/lock rules as email slot claims (§4.2).
-- Holds `role:mentor` (primary slot for client state) and manages Pain Point Marks vote under the same session.
-- **Consolidated panel** in the main app (§8.5):
-  - **Mentor scoring** — numeric entry 0–3,000 per team (§3.2)
-  - **Pain Point Marks** — tap-to-vote cards for all 4 teams; single vote worth 1,000 marks (§3.3)
-- Mentor numeric **Submit/Undo** and Pain Point **Undo Vote** disabled while the Winner announcement overlay is displayed (§8.9).
+- On first login: claim `role:mentor` in `sessions` with identifier `mentor` and display name "Mentor".
+- On return: restore the Mentor slot if still owned by `mentor`; same race/lock rules as email slot claims (§4.2).
+- Holds `role:mentor` slot.
+- **Mentor scoring panel** in the main app (§8.5) — numeric entry 0–8,000 per team (§3.2).
+- Mentor **Submit/Undo** disabled while the Winner announcement overlay is displayed (§8.9).
 - User bar shows "Mentor" with 🎓 avatar.
 
 
 
-### 4.5 Pain Point Marks (consolidated under Mentor login)
-
-- **Not a separate login or assignment.** Pain Point vote is cast from the **same consolidated panel** as Mentor scoring (§8.5).
-- Vote row uses `from_team = 'Pain Point Marks'`, `points = 1000` (§5.2); the `role:pain_point_marks` session slot is claimed alongside `role:mentor` on `mentor` keyword login (§4.4).
-- **Exactly one active Pain Point vote** — tap-to-vote + confirm + undo, same pattern as team reps (§3.3).
-
-
-
-### 4.6 Interactive (reserved login keyword)
+### 4.5 Interactive (reserved login keyword)
 
 - Entered by typing `interactive` in the login field and tapping **Continue** (§4.1). **No assignment slot** and **no** `@` validation for this exact string.
 - **Display viewport:** all Interactive UI (user bar + event screens, §8.8) is constrained to a maximum **3840 × 2160** pixel area, centered on larger displays.
@@ -297,7 +251,7 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 
 
 
-### 4.7 Slot ownership resolution
+### 4.6 Slot ownership resolution
 
 `getSlotOwnerEmail(slotKey)`:
 
@@ -321,7 +275,7 @@ Locks an assignment slot to an email. **One row per slot; one slot per user.**
 | Column      | Type        | Notes                                                                                                                                                            |
 | ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `slot_key`  | text (PK)   | e.g. `team:1`, `role:mentor` (see §2.3)                                                                                                                          |
-| `email`     | text        | Owner identifier — real voter email, or literal `mentor` for keyword login (§4.4; locks both `role:mentor` and `role:pain_point_marks`). Interactive has no row. |
+| `email`     | text        | Owner identifier — real voter email, or literal `mentor` for keyword login (§4.4). Interactive has no row. |
 | `name`      | text        | Display name                                                                                                                                                     |
 | `locked_at` | timestamptz | Default `now()`                                                                                                                                                  |
 
@@ -350,7 +304,7 @@ All score events from every assignment type.
 | `id`          | serial (PK) |                                                                           |
 | `voter_email` | text        | Voter's email                                                             |
 | `voter_name`  | text        | Display name                                                              |
-| `from_team`   | text        | Source team name (`Team 1`…) or role label (`Mentor`, `Pain Point Marks`) |
+| `from_team`   | text        | Source team name (`Team 1`…) or role label (`Mentor`) |
 | `to_team_id`  | int         | Target team 1–4                                                           |
 | `points`      | int         | Point amount                                                              |
 | `created_at`  | timestamptz | Default `now()`                                                           |
@@ -359,17 +313,15 @@ All score events from every assignment type.
 `from_team` **values by assignment:**
 
 
-| Assignment       | `from_team` value                         |
-| ---------------- | ----------------------------------------- |
-| Team 1–4         | `Team 1`, `Team 2`, … (voter's team name) |
-| Mentor           | `Mentor`                                  |
-| Pain Point Marks | `Pain Point Marks`                        |
+| Assignment | `from_team` value                         |
+| ---------- | ----------------------------------------- |
+| Team 1–4   | `Team 1`, `Team 2`, … (voter's team name) |
+| Mentor     | `Mentor`                                  |
 
 
 **Persistence rules:**
 
 - **Team rep:** one row per `voter_email` total (single active vote). **Undo** deletes the row; user may confirm a new vote for a different team. Disabled while winner announcement is displayed.
-- **Pain Point Marks:** one row per `voter_email` total (single active vote, `from_team = 'Pain Point Marks'`). Same undo / re-vote rules as team rep (§3.3). Disabled while winner announcement is displayed.
 - **Mentor numeric:** one row per `voter_email` + `to_team_id` + `from_team = 'Mentor'`. **Undo** deletes the row. No in-place amend — undo then re-submit. Disabled while winner announcement is displayed.
 
 
@@ -428,13 +380,12 @@ alter publication supabase_realtime add table event_state;
 
 | Variable          | Type                                                      | Description                                                                                                                                                                                                |
 | ----------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `currentUser`     | `{name, email, avatar, slot?, isInteractive?}` | `slot` when assigned (`team:N` or `role:mentor` for keyword login); `email` may be a real address, `interactive`, or `mentor`; `isInteractive: true` (§4.6) for read-only entry |
+| `currentUser`     | `{name, email, avatar, slot?, isInteractive?}` | `slot` when assigned (`team:N` or `role:mentor` for keyword login); `email` may be a real address, `interactive`, or `mentor`; `isInteractive: true` (§4.5) for read-only entry |
 | `votes`           | `{teamId: total}`                                         | Running totals per team                                                                                                                                                                                    |
 | `voteLog`         | array                                                     | Vote rows for running totals and winner announcement                                                                                                                                                       |
 | `myTeamVote`      | `{teamId, confirmed}` or `null`                           | Team rep's single vote (§3.1)                                                                                                                                                                              |
-| `myPainPointVote` | `{teamId, confirmed}` or `null`                           | Mentor's single Pain Point vote (§3.3)                                                                                                                                                                     |
 | `myRoleScores`    | `{teamId: points}`                                        | Mentor keyword user's numeric Mentor scores (§3.2)                                                                                                                                                         |
-| `takenSlots`      | `{slotKey: email}`                                        | Active session locks for all 6 options                                                                                                                                                                     |
+| `takenSlots`      | `{slotKey: email}`                                        | Active session locks for all 5 options                                                                                                                                                                     |
 | `roleScoreDrafts` | `{teamId: string}`                                        | In-progress role score inputs                                                                                                                                                                              |
 | `ourVoteIds`      | Set                                                       | Dedup own inserts from realtime                                                                                                                                                                            |
 | `winnerAnnounced` | boolean                                                   | `true` when Winner announcement overlay is open (§8.9); synced from `event_state`                                                                                                                         |
@@ -445,7 +396,7 @@ alter publication supabase_realtime add table event_state;
 ### 6.1 Session persistence (localStorage)
 
 - Key: `lv_session_v2`
-- Fields: `{ email, name, slotKey }` for assigned users — e.g. `team:2` or `role:mentor` (with `email: "mentor"`). Mentor keyword sessions also lock `role:pain_point_marks` in DB but localStorage uses `slotKey: 'role:mentor'` as primary.
+- Fields: `{ email, name, slotKey }` for assigned users — e.g. `team:2` or `role:mentor` (with `email: "mentor"`).
 - Interactive: `{ isInteractive: true, votingStarted?: boolean }` — `votingStarted: true` after **Let's go!** (§8.8); restored on reload to skip ready screen
 - Restored on page load via `tryRestoreSession()`
 - Cleared on logout; abandoned if slot claimed by another email
@@ -614,8 +565,8 @@ All surfaces in this section must implement §7 (Cartoon Game Leaderboard theme)
 - Text input (email-style) + Continue (chunky CTA button)
 - **Accepted input on Continue** (§4.1):
   - Valid **email address** (`@` present) → assignment picker (**Team 1–4 only**)
-  - Reserved keyword `interactive` (exact, case-insensitive) → Interactive mode (§4.6)
-  - Reserved keyword `mentor` (exact, case-insensitive) → Mentor mode (§4.4); claims `role:mentor` + `role:pain_point_marks`; consolidated scoring UI (§8.5)
+  - Reserved keyword `interactive` (exact, case-insensitive) → Interactive mode (§4.5)
+  - Reserved keyword `mentor` (exact, case-insensitive) → Mentor mode (§4.4); claims `role:mentor`; Mentor scoring UI (§8.5)
   - Invalid (no `@` and not a keyword) → error toast
 - **No visible hints** for `interactive` or `mentor` on the auth screen
 - Title: "PROJECT FARMER KEYNOTE DAY 2026-07-18 VOTING SYSTEM" in display font (three lines on auth screen: PROJECT FARMER / KEYNOTE DAY 2026-07-18 / VOTING SYSTEM)
@@ -661,39 +612,30 @@ Shown only for `team:N` assignments. **No numeric input or keypad.**
 
 
 
-### 8.5 Mentor scoring UI (consolidated with Pain Point Marks)
+### 8.5 Mentor scoring UI
 
 Shown only for `mentor` keyword login (`role:mentor`). **Must be visible** (`display: block`) when a Mentor is logged in — hidden for team reps and Interactive.
 
-Single cream game panel in the main app (§7.4) with **two sections**:
+Single cream game panel in the main app (§7.4):
 
 **Layout:**
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  🎓 Mentor Scoring                                           │
-│  Enter 0–3,000 mentor marks per team and submit.             │
+│  Enter 0–8,000 mentor marks per team and submit.             │
 │                                                              │
 │  🔥 Team 1   [ 1500 ]  [ Submit ]                            │
 │  ⚡ Team 2   [  800 ]  [ Undo  ]  (locked)                   │
 │  🌊 Team 3   [    0 ]  [ Submit ]                            │
 │  🦁 Team 4   [ 2200 ]  [ Undo  ]  (locked)                   │
-│                                                              │
-│  ── 📌 Pain Point Vote (1,000 marks) ──────────────────     │
-│  Tap the team to award your single Pain Point vote.          │
-│                                                              │
-│  [ Team 1 ]  [ Team 2 ]  [ Team 3 ]  [ Team 4 ]              │
-│  (after vote: chosen card highlighted; others disabled)      │
-│  [ Undo Vote ]                                               │
 └──────────────────────────────────────────────────────────────┘
 ```
-
-**Section 1 — Mentor numeric scoring (§3.2):**
 
 Per-team row (four rows):
 
 1. **Team label** — emoji + name + left accent stripe in team color.
-2. **Score input** — large centered numeric field; `0–3,000` validation (clamp or warn above max).
+2. **Score input** — large centered numeric field; `0–8,000` validation (clamp or warn above max).
 3. **Submit** (unsubmitted rows) — persist that team's Mentor score; lock input; switch button to **Undo**.
 4. **Undo** (submitted rows) — delete that team's Mentor vote row; unlock input. **Disabled** while Winner announcement is displayed (§8.9).
 5. **Saved indicator** — when locked, show `Saved: N` under the team name (visible to Mentor only).
@@ -701,23 +643,9 @@ Per-team row (four rows):
 - Enter key in an unlocked input submits that row.
 - No batch submit.
 
-**Section 2 — Pain Point tap-to-vote (§3.3):**
+**While Winner announcement displayed:** all Mentor **Submit** / **Undo** disabled; hint text notes scoring is locked.
 
-Same interaction pattern as team-rep voting (§8.4), with these differences:
-
-- **All 4 team cards** are tappable (Mentor has no "own team").
-- Instruction: e.g. "Tap the team to award your Pain Point vote — one vote worth 1,000 marks."
-- **On tap** (no active Pain Point vote): open **confirmation dialog** (§8.7)
-  - Message: confirm casting the Pain Point vote (1,000 marks) to the chosen team
-  - **Confirm** → persist vote (`from_team = 'Pain Point Marks'`, `points = 1000`); lock other cards; show voted state + **Undo Vote**
-  - **Cancel** → close dialog, no vote
-- **After vote:** highlight chosen team; show "✓ Pain Point vote — 1,000 marks to [Team X]"; other cards disabled.
-- **Undo Vote:** delete Pain Point vote row; unlock all four cards.
-- **While Winner announcement displayed (§8.9):** all cards and **Undo Vote** disabled.
-
-**While Winner announcement displayed:** all Mentor **Submit** / **Undo** and Pain Point cards / **Undo Vote** disabled; hint text notes scoring is locked.
-
-**Returning users:** pre-fill and lock Mentor numeric rows from `myRoleScores`; restore Pain Point voted state from `myPainPointVote` (unless announcement is displayed).
+**Returning users:** pre-fill and lock Mentor numeric rows from `myRoleScores` (unless announcement is displayed).
 
 ### 8.6 Toast notifications
 
@@ -725,12 +653,11 @@ Same interaction pattern as team-rep voting (§8.4), with these differences:
 
 
 
-### 8.7 Vote confirmation dialog (team reps & Pain Point vote)
+### 8.7 Vote confirmation dialog (team reps)
 
-- Modal overlay triggered by tap on an eligible team card (team rep §8.4 or Mentor Pain Point §8.5)
+- Modal overlay triggered by tap on an eligible team card (team rep §8.4)
 - Shows chosen team name/emoji and fixed 1,000 marks
 - Team rep copy: e.g. "Cast your vote (1,000 marks) to [Team X]?"
-- Pain Point copy: e.g. "Cast your Pain Point vote (1,000 marks) to [Team X]?"
 - Confirm / Cancel buttons
 - Blocks interaction with vote cards until dismissed
 
@@ -738,7 +665,7 @@ Same interaction pattern as team-rep voting (§8.4), with these differences:
 
 ### 8.8 Interactive display (event screen)
 
-Shown only for `interactive` keyword login (§4.6). Replaces the main voting/scoring content area; user bar (§8.3) remains visible above.
+Shown only for `interactive` keyword login (§4.5). Replaces the main voting/scoring content area; user bar (§8.3) remains visible above.
 
 **Viewport constraint:**
 
@@ -792,7 +719,6 @@ Shown only for `interactive` keyword login (§4.6). Replaces the main voting/sco
 - **Completion detection:** voting is **complete** when all of the following are satisfied in the current `voteLog` / DB state:
   - Each of the **4 team slots** has cast its team-rep vote (`from_team` = `Team 1` … `Team 4`, one row each).
   - **Mentor** has submitted a score for **all 4 teams** (`from_team = 'Mentor'`, one row per target team).
-  - **Pain Point Marks** vote has been awarded (`from_team = 'Pain Point Marks'`, one row).
 - **Done control:** when complete, wait **5 seconds** (`INTERACTIVE_VOTING_DONE_MS`) with **no undo** (no vote `DELETE` that breaks completeness); then hide the status caption and show a large colorful animated button: **"Voting is done! And the winner is..."**. Tapping the button opens the Winner announcement overlay (§8.9). Any undo during the wait or after done reverts to **"Voting in progress..."**, restarts the 5-second stability window once complete again, and resumes `vote_bgm.mp3`.
 - **Done audio:** when the done button appears, **stop** looping `sounds/vote_bgm.mp3` and **play once** `sounds/done_vote.mp3` (preloaded on login).
 - Persists `votingStarted: true` in localStorage so reload skips Phase 1.
@@ -931,9 +857,8 @@ Use HTML5 `Audio` with `loop: true` for BGM and `preload: auto`. On Interactive 
 
 ```javascript
 TEAM_VOTE_PTS         = 1000   // fixed marks for team rep single vote
-PAIN_POINT_VOTE_PTS   = 1000   // fixed marks for Mentor Pain Point single vote (§3.3)
 MENTOR_MIN_PTS        = 0
-MENTOR_MAX_PTS        = 3000   // per team, Mentor numeric scoring
+MENTOR_MAX_PTS        = 8000   // per team, Mentor numeric scoring
 FW_DURATION_MS        = 8000     // confetti burst duration
 POLL_MS               = 4000     // polling fallback interval
 VOTE_BGM_FADE_MS      = 1000     // vote BGM fade-out before winner overlay (§8.9)
@@ -942,14 +867,14 @@ INTERACTIVE_MAX_H     = 2160     // max Interactive viewport height (§8.8)
 INTERACTIVE_QR_IMAGE  = 'images/vote-qr-code.png'
 INTERACTIVE_VOTING_DONE_MS = 5000   // stability window before done button (§8.8)
 STORAGE_KEY           = 'lv_session_v2'
-INTERACTIVE_EMAIL     = 'interactive'  // reserved login keyword (§4.6)
+INTERACTIVE_EMAIL     = 'interactive'  // reserved login keyword (§4.5)
 MENTOR_EMAIL          = 'mentor'       // reserved login keyword (§4.4)
 USE_SUPABASE          = true
 
 TEAMS = [ /* 4 teams — see §2.1 */ ]
-ROLES = [ /* 2 roles — see §2.2 */ ]
+ROLES = [ /* 1 role — see §2.2 */ ]
 SLOT_KEYS = [ 'team:1', 'team:2', 'team:3', 'team:4',
-              'role:mentor', 'role:pain_point_marks' ]
+              'role:mentor' ]
 ```
 
 Supabase credentials: `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key).
@@ -960,20 +885,18 @@ Supabase credentials: `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key).
 
 ## 12. Constraints & Edge Cases
 
-1. **One slot per email user:** an email user may hold only one team slot (`team:1`–`team:4`); enforced by unique email index and UI. `mentor` keyword login holds both `role:mentor` and `role:pain_point_marks` under identifier `mentor`.
+1. **One slot per email user:** an email user may hold only one team slot (`team:1`–`team:4`); enforced by unique email index and UI. `mentor` keyword login holds `role:mentor` under identifier `mentor`.
 2. **One user per slot:** once claimed, slot locked; other users see email under that option in the assignment dialog.
 3. **Team rep — one active vote:** after confirm, other cards locked; **Undo Vote** deletes row and allows a new choice. Disabled while Winner announcement is displayed (§8.9).
 4. **Team rep — cannot vote for self:** own team card is locked and never opens the confirmation dialog.
 5. **Team rep — fixed 1,000:** no variable amount; `points` always `1000` in DB.
-6. **Mentor numeric — per-team cap:** reject or clamp scores outside 0–3,000.
-7. **Pain Point Marks — one active vote:** after confirm, other cards locked; **Undo Vote** deletes row and allows a new choice. Disabled while Winner announcement is displayed (§8.9).
-8. **Pain Point Marks — fixed 1,000:** no variable amount; `points` always `1000` in DB; `from_team = 'Pain Point Marks'`.
-9. **Mentor numeric score changes:** undo deletes row; must re-submit (no in-place edit). Disabled while Winner announcement is displayed (§8.9).
-10. **Winner announcement lock:** while §8.9 overlay is open (`event_state.winner_announced = true`), all team **Undo Vote**, Mentor **Submit** / **Undo**, and Pain Point **Undo Vote** controls are disabled on every client.
-11. **Race on slot claim:** check existing session before insert; refresh dialog on failure.
-12. **Logout ≠ unlock:** session row stays so email can return; other emails blocked.
-13. **UI updates during editing:** scoring UI frozen while confirmation dialog open or role inputs active.
-14. **Email display:** claimer email must appear under locked options in the assignment dialog.
+6. **Mentor numeric — per-team cap:** reject or clamp scores outside 0–8,000.
+7. **Mentor numeric score changes:** undo deletes row; must re-submit (no in-place edit). Disabled while Winner announcement is displayed (§8.9).
+8. **Winner announcement lock:** while §8.9 overlay is open (`event_state.winner_announced = true`), all team **Undo Vote** and Mentor **Submit** / **Undo** controls are disabled on every client.
+9. **Race on slot claim:** check existing session before insert; refresh dialog on failure.
+10. **Logout ≠ unlock:** session row stays so email can return; other emails blocked.
+11. **UI updates during editing:** scoring UI frozen while confirmation dialog open or role inputs active.
+12. **Email display:** claimer email must appear under locked options in the assignment dialog.
 
 ---
 
@@ -1025,21 +948,20 @@ Supabase credentials: `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key).
 | Area               | Old                                 | New                                                                                                   |
 | ------------------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Teams              | 6 teams                             | 4 teams (Team 1–4)                                                                                    |
-| Post-login         | Team picker or Viewer               | Email → team picker (4 teams only); `mentor` keyword → consolidated Mentor + Pain Point Marks UI      |
-| Assignments        | Team or Viewer                      | 6 slots in DB (4 teams + 2 roles); email users pick teams only; both role slots via `mentor` keyword  |
-| Roles              | None                                | Mentor + Pain Point Marks (single `mentor` keyword login, consolidated UI §8.5)                       |
-| Viewer mode        | Explicit button on auth screen      | **Removed** — use `interactive` keyword for read-only display (§4.6)                                  |
+| Post-login         | Team picker or Viewer               | Email → team picker (4 teams only); `mentor` keyword → Mentor scoring UI                                |
+| Assignments        | Team or Viewer                      | 5 slots in DB (4 teams + Mentor role); email users pick teams only; Mentor via `mentor` keyword       |
+| Roles              | None                                | Mentor (single `mentor` keyword login, §8.5)                                                          |
+| Viewer mode        | Explicit button on auth screen      | **Removed** — use `interactive` keyword for read-only display (§4.5)                                  |
 | Interactive mode   | —                                   | Reserved keyword `interactive` + Continue; two-phase event display (§8.8), BGM on **Let's go!**, winner overlay (§8.9) |
-| Mentor entry       | —                                   | Reserved keyword `mentor` + Continue; claims both role slots; consolidated scoring panel (§8.5)       |
+| Mentor entry       | —                                   | Reserved keyword `mentor` + Continue; claims `role:mentor`; Mentor scoring panel (§8.5)                 |
 | Session PK         | `team_id` int                       | `slot_key` text                                                                                       |
 | Chart labels       | Team name only                      | *(removed — no live standings chart)*                                                                 |
 | Vote status board  | Participation matrix                | *(removed)*                                                                                           |
 | Dialog taken state | "🔒 Taken" only                     | 🔒 + claimer email under option                                                                       |
 | Team rep voting    | Up to 5 votes, 1–5,000 each, keypad | **1 active vote**, fixed **1,000**, tap + confirm + **Undo Vote** (locked during winner announcement) |
-| Mentor             | Observer only                       | **0–3,000** per team via consolidated UI (§8.5)                                                       |
-| Pain Point Marks   | Bonus row only                      | Single tap-to-vote in Mentor UI (§8.5); fixed **1,000** marks                                         |
+| Mentor             | Observer only                       | **0–8,000** per team via Mentor UI (§8.5)                                                             |
 | Bonus layer        | Separate `__BONUS__` sentinel       | Removed; all scores in `votes` table                                                                  |
-| Score entry        | Keypad for team reps                | Tap-to-vote (team reps + Pain Point); numeric inputs (Mentor marks only, §8.5)                        |
+| Score entry        | Keypad for team reps                | Tap-to-vote (team reps); numeric inputs (Mentor marks only, §8.5)                                     |
 | Visual theme       | Dark sci-fi (Orbitron, neon)        | **Cartoon Game Leaderboard** (§7) — sky bg, chunky UI, Fredoka/Nunito                                 |
 
 

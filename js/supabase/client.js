@@ -169,24 +169,4 @@
     }
     return LV.dbSaveVote(toTeamId, points, fromTeam);
   };
-
-  LV.dbSavePainPointVote = async function (toTeamId) {
-    const fromTeam = LV.ROLES.find(r => r.id === 'pain_point_marks')?.fromTeam || 'Pain Point Marks';
-    return LV.dbSaveVote(toTeamId, LV.PAIN_POINT_VOTE_PTS, fromTeam);
-  };
-
-  LV.dbUndoPainPointVote = async function () {
-    if (!LV.dbClient) return { ok: true };
-    const fromTeam = LV.ROLES.find(r => r.id === 'pain_point_marks')?.fromTeam || 'Pain Point Marks';
-    const { error } = await LV.dbClient.from('votes')
-      .delete()
-      .eq('voter_email', LV.currentUser.email)
-      .eq('from_team', fromTeam);
-    if (error) {
-      console.error('[dbUndoPainPointVote] delete failed', error);
-      LV.showToast('DB delete failed: ' + error.message, true);
-      return { ok: false };
-    }
-    return { ok: true };
-  };
 })(window.LV);
