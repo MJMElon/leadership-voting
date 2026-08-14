@@ -5,6 +5,8 @@
   LV.TEAM_VOTE_PTS = 1000;
   LV.MENTOR_MIN_PTS = 0;
   LV.MENTOR_MAX_PTS = 8000;
+  LV.PREVIOUS_MIN_PTS = 0;
+  LV.PREVIOUS_MAX_PTS = 10000;
   LV.FW_DURATION_MS = 8000;
   LV.POLL_MS = 2000;
   LV.VOTE_BGM_FADE_MS = 1000;
@@ -18,9 +20,11 @@
   LV.STORAGE_KEY = 'lv_session_v2';
   LV.INTERACTIVE_EMAIL = 'interactive';
   LV.MENTOR_EMAIL = 'mentor';
+  LV.PREVIOUS_EMAIL = 'previous';
 
   LV.TEAM_SLOT_KEYS = ['team:1', 'team:2', 'team:3', 'team:4'];
   LV.MENTOR_SLOT_KEYS = ['role:mentor'];
+  LV.PREVIOUS_SLOT_KEYS = ['role:previous'];
 
   LV.TEAMS = [
     { id: 1, name: 'Team 1', emoji: '🔥', color: '#f59e0b' },
@@ -30,13 +34,13 @@
   ];
 
   LV.ROLES = [
-    { id: 'mentor', name: 'Mentor', fromTeam: 'Mentor' },
+    { id: 'mentor', name: 'Mentor', fromTeam: 'Mentor', avatar: '🎓', keyword: LV.MENTOR_EMAIL, minPts: LV.MENTOR_MIN_PTS, maxPts: LV.MENTOR_MAX_PTS },
+    { id: 'previous', name: 'Previous', fromTeam: 'Previous', avatar: '⏮️', keyword: LV.PREVIOUS_EMAIL, minPts: LV.PREVIOUS_MIN_PTS, maxPts: LV.PREVIOUS_MAX_PTS },
   ];
 
-  LV.SLOT_KEYS = [
-    'team:1', 'team:2', 'team:3', 'team:4',
-    'role:mentor',
-  ];
+  LV.ROLE_SLOT_KEYS = LV.ROLES.map(r => 'role:' + r.id);
+
+  LV.SLOT_KEYS = LV.TEAM_SLOT_KEYS.concat(LV.ROLE_SLOT_KEYS);
 
   LV.MEDALS = ['🥇', '🥈', '🥉', '4️⃣'];
 
@@ -58,6 +62,18 @@
     const parsed = LV.parseSlotKey(slotKey);
     if (!parsed) return { label: slotKey, emoji: '' };
     if (parsed.type === 'team') return { label: parsed.team.name, emoji: parsed.team.emoji };
-    return { label: parsed.role.name, emoji: '🎓' };
+    return { label: parsed.role.name, emoji: parsed.role.avatar || '🎓' };
+  };
+
+  LV.findRoleByKeyword = function (raw) {
+    const key = String(raw || '').trim().toLowerCase();
+    return LV.ROLES.find(r => r.id === key || r.keyword === key) || null;
+  };
+
+  LV.getRoleScoreLimits = function (role) {
+    return {
+      min: role?.minPts ?? LV.MENTOR_MIN_PTS,
+      max: role?.maxPts ?? LV.MENTOR_MAX_PTS,
+    };
   };
 })(window.LV = window.LV || {});

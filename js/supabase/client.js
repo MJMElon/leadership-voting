@@ -41,12 +41,12 @@
     });
   };
 
-  LV.dbLockMentorSlots = async function (email, name) {
-    for (const slotKey of LV.MENTOR_SLOT_KEYS) {
+  LV.dbLockRoleSlots = async function (slotKeys, email, name) {
+    for (const slotKey of slotKeys) {
       const owner = LV.getSlotOwnerEmail(slotKey);
       if (owner && owner !== email) return false;
     }
-    for (const slotKey of LV.MENTOR_SLOT_KEYS) {
+    for (const slotKey of slotKeys) {
       const ok = await LV.dbLockSlot(slotKey, email, name);
       if (!ok) return false;
     }

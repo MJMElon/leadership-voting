@@ -1,14 +1,14 @@
-# Project Farmer Keynote Day 2026-07-18 — Scoring System Spec
+# Project Farmer Final Keynote Day 2026-08-15 — Scoring System Spec
 
 Source of truth for rebuilding the voting/scoring system. Derived from `index.html.bak` (original implementation), updated for 4-team + role assignment model.
 
-**Deployment:** GitHub Pages at `vote.mjmnursery.com` (see `CNAME`).
+**Deployment:** GitHub Pages at `vote.puigroups.com` (see `CNAME`).
 
 ---
 
 ## 1. Purpose
 
-A live, multi-device voting app for the **Project Farmer Keynote Day 2026-07-18** event. Four teams compete for total points. The login field accepts **email addresses** (team voters) or two reserved keywords — `interactive` and `mentor` — each with a distinct role (§4.1). After sign-in, email users claim exactly one team (Team 1–4) via the assignment picker (§4.2). The `mentor` keyword skips the picker and enters numeric Mentor scoring (§4.4, §8.5). Scoring behavior depends on assignment type (see §3). The entire UI uses the **Cartoon Game Leaderboard** theme (§7).
+A live, multi-device voting app for the **Project Farmer Keynote Day 2026-07-18** event. Four teams compete for total points. The login field accepts **email addresses** (team voters) or three reserved keywords — `interactive`, `mentor`, and `previous` — each with a distinct role (§4.1). After sign-in, email users claim exactly one team (Team 1–4) via the assignment picker (§4.2). The `mentor` and `previous` keywords skip the picker and enter numeric role scoring (§4.4, §8.5). Scoring behavior depends on assignment type (see §3). The entire UI uses the **Cartoon Game Leaderboard** theme (§7).
 
 ---
 
@@ -16,7 +16,7 @@ A live, multi-device voting app for the **Project Farmer Keynote Day 2026-07-18*
 
 ## 2. Assignment Options
 
-Each logged-in user claims exactly one assignment slot: **email users** pick one team (`team:1`–`team:4`); `mentor` keyword login claims the `role:mentor` slot under identifier `mentor`. Once claimed, a slot is locked to that user's email/identifier; no other user may select it.
+Each logged-in user claims exactly one assignment slot: **email users** pick one team (`team:1`–`team:4`); `mentor` keyword login claims the `role:mentor` slot under identifier `mentor`; `previous` keyword login claims the `role:previous` slot under identifier `previous`. Once claimed, a slot is locked to that user's email/identifier; no other user may select it.
 
 ### 2.1 Teams (4 options)
 
@@ -33,33 +33,35 @@ Configurable constant `TEAMS` — 4 teams, each with `id`, `name`, `emoji`, `col
 
 Team slots are for **team representatives** who cast one fixed-value vote for their chosen best team (§3.1).
 
-### 2.2 Roles (1 option)
+### 2.2 Roles (2 options)
 
 
-| ID       | Name   | How to enter                                                         |
-| -------- | ------ | -------------------------------------------------------------------- |
-| `mentor` | Mentor | Login keyword `mentor` (§4.1, §4.4) — numeric scoring for all teams (§8.5) |
+| ID         | Name     | How to enter                                                                                                |
+| ---------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `mentor`   | Mentor   | Login keyword `mentor` (§4.1, §4.4) — numeric scoring for all teams (§8.5)                                  |
+| `previous` | Previous | Login keyword `previous` (§4.1, §4.4) — numeric scoring for all teams (§8.5); max **10,000** marks per team |
 
 
-Configurable constant `ROLES` — each with `id`, `name`.
+Configurable constant `ROLES` — each with `id`, `name`, `fromTeam`, `avatar`, `keyword`, `minPts`, `maxPts`.
 
-Role slot: **Mentor** scores all four teams with numeric entry (§3.2).
+Role slots: **Mentor** and **Previous** each score all four teams with numeric entry (§3.2). Both roles share the same submit/undo flow; **Previous** may enter up to **10,000** marks per team (Mentor remains **8,000**).
 
 ### 2.3 Slot keys (unified identifier)
 
 All five options share one locking namespace. Use stable slot keys in the DB and client:
 
 
-| Slot key                | Display name     | Type |
-| ----------------------- | ---------------- | ---- |
-| `team:1`                | Team 1           | team |
-| `team:2`                | Team 2           | team |
-| `team:3`                | Team 3           | team |
-| `team:4`                | Team 4           | team |
-| `role:mentor` | Mentor | role |
+| Slot key        | Display name | Type |
+| --------------- | ------------ | ---- |
+| `team:1`        | Team 1       | team |
+| `team:2`        | Team 2       | team |
+| `team:3`        | Team 3       | team |
+| `team:4`        | Team 4       | team |
+| `role:mentor`   | Mentor       | role |
+| `role:previous` | Previous     | role |
 
 
-**Total: 5 slot keys** — email users choose one team; `mentor` keyword holds the Mentor role slot; no duplicates across users.
+**Total: 6 slot keys** — email users choose one team; `mentor` keyword holds the Mentor role slot; `previous` keyword holds the Previous role slot; no duplicates across users.
 
 ---
 
@@ -74,19 +76,19 @@ All points are **additive**: a team's total is the sum of every score row receiv
 Applies when the logged-in user holds a `team:N` slot (Team 1–4).
 
 
-| Rule            | Detail                                                                                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Votes allowed   | **Exactly one active vote** per user, for **one** other team                                                                                            |
-| Cannot vote for | Own team                                                                                                                                                |
-| Points awarded  | **Fixed 1,000 marks** — no score entry, no variable amount                                                                                              |
-| Interaction     | **Tap-to-vote** — user taps the team card they consider best                                                                                            |
-| Own team card   | **Shown but locked** — "Your team" badge; not tappable                                                                                                  |
-| Confirmation    | After tap, a **confirmation dialog** asks whether to cast their vote to that team                                                                       |
-| On confirm      | Insert vote row (`points = 1000`); UI locks other cards; show voted state                                                                               |
-| Undo            | Tap **Undo Vote** → delete vote row; unlock all eligible cards; user may tap a different team and confirm again                                         |
-| Re-vote         | After undo, user may vote for any eligible team (same confirm flow)                                                                                     |
+| Rule            | Detail                                                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Votes allowed   | **Exactly one active vote** per user, for **one** other team                                                                                           |
+| Cannot vote for | Own team                                                                                                                                               |
+| Points awarded  | **Fixed 1,000 marks** — no score entry, no variable amount                                                                                             |
+| Interaction     | **Tap-to-vote** — user taps the team card they consider best                                                                                           |
+| Own team card   | **Shown but locked** — "Your team" badge; not tappable                                                                                                 |
+| Confirmation    | After tap, a **confirmation dialog** asks whether to cast their vote to that team                                                                      |
+| On confirm      | Insert vote row (`points = 1000`); UI locks other cards; show voted state                                                                              |
+| Undo            | Tap **Undo Vote** → delete vote row; unlock all eligible cards; user may tap a different team and confirm again                                        |
+| Re-vote         | After undo, user may vote for any eligible team (same confirm flow)                                                                                    |
 | Lock            | **Undo and re-vote disabled** while the **Winner announcement** overlay is displayed (§8.9) — synced to all clients via `event_state.winner_announced` |
-| On cancel       | Close dialog; no vote cast; user may tap a different team                                                                                               |
+| On cancel       | Close dialog; no vote cast; user may tap a different team                                                                                              |
 
 
 **Flow:**
@@ -101,30 +103,33 @@ Tap team card (not own team)
 
 After voting, show which team received the vote. Other team cards are inactive until **Undo**. While the winner announcement is displayed, all cards and **Undo** are disabled.
 
-### 3.2 Mentor — score all four teams (0–8,000 each)
+### 3.2 Role scoring — Mentor and Previous
 
-Applies when the logged-in user holds the `role:mentor` slot (`mentor` keyword login, §4.4). Scores are entered via **numeric rows** in the Mentor panel (§8.5).
-
-
-| Rule           | Detail                                                                                                                                              |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Targets        | All **4 teams**                                                                                                                                     |
-| Per-team range | **Minimum 0**, **maximum 8,000** marks each                                                                                                         |
-| Input          | Numeric score entry per team (four inputs)                                                                                                          |
-| Submission     | User enters a score for a chosen team and taps **Submit** on that row                                                                               |
-| After submit   | Input **locks**; row button changes from **Submit** to **Undo**                                                                                     |
-| Undo           | Tap **Undo** → delete that team's vote row; unlock input; Mentor must re-enter and submit a new score |
-| Lock           | **Submit and Undo disabled** while the **Winner announcement** overlay is displayed (§8.9) — synced via `event_state.winner_announced`             |
-| Amend          | **Not allowed in place** — Mentor must **Undo** first, then enter and submit again                                                                  |
+Applies when the logged-in user holds `role:mentor` (`mentor` keyword) or `role:previous` (`previous` keyword) (§4.4). Both roles use the same numeric panel (§8.5) with per-role min/max validation; scores are stored separately (`from_team = 'Mentor'` vs `'Previous'`).
 
 
-Mentor may assign 0 to any team (e.g. skip a team without scoring it).
+| Rule           | Detail                                                                                                                                 |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Targets        | All **4 teams**                                                                                                                        |
+| Per-team range | **Minimum 0**; **maximum 8,000** marks each (Mentor) or **10,000** marks each (Previous)                                               |
+| Input          | Numeric score entry per team (four inputs)                                                                                             |
+| Submission     | User enters a score for a chosen team and taps **Submit** on that row                                                                  |
+| After submit   | Input **locks**; row button changes from **Submit** to **Undo**                                                                        |
+| Undo           | Tap **Undo** → delete that team's vote row; unlock input; the role user must re-enter and submit a new score                           |
+| Lock           | **Submit and Undo disabled** while the **Winner announcement** overlay is displayed (§8.9) — synced via `event_state.winner_announced` |
+| Amend          | **Not allowed in place** — the role user must **Undo** first, then enter and submit again                                              |
+
+
+Mentor or Previous may assign 0 to any team (e.g. skip a team without scoring it).
 
 
 | Assignment | Teams scored | Points per submission | Max submissions             | Input style                   |
 | ---------- | ------------ | --------------------- | --------------------------- | ----------------------------- |
 | Team 1–4   | 1 (not self) | Fixed 1,000           | 1 active (undo to change)   | Tap + confirm dialog + undo   |
 | Mentor     | All 4        | 0–8,000 each          | 1 per team (undo to change) | Numeric entry per team (§8.5) |
+| Previous   | All 4        | 0–10,000 each         | 1 per team (undo to change) | Numeric entry per team (§8.5) |
+
+
 
 
 ### 3.3 Total score formula
@@ -133,7 +138,7 @@ Mentor may assign 0 to any team (e.g. skip a team without scoring it).
 team_total[team_id] = sum(all vote rows where to_team_id = team_id)
 ```
 
-No separate bonus layer — Mentor scores are regular vote rows distinguished by `from_team` (role label).
+No separate bonus layer — Mentor and Previous scores are regular vote rows distinguished by `from_team` (role label).
 
 ### 3.4 Ranking
 
@@ -153,12 +158,13 @@ No separate bonus layer — Mentor scores are regular vote rows distinguished by
 The auth screen has a single text field (labeled for email) and **Continue**. Input is resolved in this order:
 
 
-| Input             | Detection                                      | Result                                                                                                                                          |
-| ----------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `interactive`     | Exact match, case-insensitive; no `@` required | **Interactive** mode (§4.5) — skip assignment picker                                                                                            |
-| `mentor`          | Exact match, case-insensitive; no `@` required | **Mentor** mode (§4.4) — skip assignment picker; claim or restore `role:mentor`; Mentor scoring UI (§8.5) |
-| **Email address** | Contains `@` (validated on Continue)           | **Team voter** — show assignment picker (§4.2); **Team 1–4 only**                                                                               |
-| Anything else     | No `@` and not a reserved keyword              | Toast error: enter a valid email address                                                                                                        |
+| Input             | Detection                                      | Result                                                                                                                               |
+| ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `interactive`     | Exact match, case-insensitive; no `@` required | **Interactive** mode (§4.5) — skip assignment picker                                                                                 |
+| `mentor`          | Exact match, case-insensitive; no `@` required | **Mentor** mode (§4.4) — skip assignment picker; claim or restore `role:mentor`; Mentor scoring UI (§8.5)                            |
+| `previous`        | Exact match, case-insensitive; no `@` required | **Previous** mode (§4.4) — skip assignment picker; claim or restore `role:previous`; Previous scoring UI (§8.5), max 10,000 per team |
+| **Email address** | Contains `@` (validated on Continue)           | **Team voter** — show assignment picker (§4.2); **Team 1–4 only**                                                                    |
+| Anything else     | No `@` and not a reserved keyword              | Toast error: enter a valid email address                                                                                             |
 
 
 **Email users (no OAuth):**
@@ -170,12 +176,13 @@ The auth screen has a single text field (labeled for email) and **Continue**. In
 
 - `interactive`**:** display name "Interactive", avatar 📺; identifier stored as `interactive` (same as `INTERACTIVE_EMAIL` constant).
 - `mentor`**:** display name "Mentor", avatar 🎓; identifier stored as `mentor` (same as `MENTOR_EMAIL` constant).
+- `previous`**:** display name "Previous", avatar ⏮️; identifier stored as `previous` (same as `PREVIOUS_EMAIL` constant).
 
-Neither `interactive` nor `mentor` is shown as a hint on the auth screen; both are reserved keywords for event staff / designated roles.
+Neither `interactive`, `mentor`, nor `previous` is shown as a hint on the auth screen; all three are reserved keywords for event staff / designated roles.
 
 ### 4.2 Assignment picker dialog (post-login, email users only)
 
-Shown **only** after a successful **email** sign-in (§4.1). `interactive` and `mentor` keyword logins **never** see this dialog.
+Shown **only** after a successful **email** sign-in (§4.1). `interactive`, `mentor`, and `previous` keyword logins **never** see this dialog.
 
 Immediately after email sign-in (or when a returning email user has no valid saved assignment), a **modal dialog** appears. The user must choose **exactly one** of four team options before entering the main app.
 
@@ -195,7 +202,7 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 **Rules:**
 
 1. User selects **one** team button.
-2. **No role section** — Mentor is entered via the `mentor` login keyword (§4.1, §4.4), not this dialog.
+2. **No role section** — Mentor and Previous are entered via the `mentor` / `previous` login keywords (§4.1, §4.4), not this dialog.
 3. On claim success → close dialog, enter main app with that assignment.
 4. On claim failure (race) → refresh dialog, show slot as taken, toast error.
 5. **Locked slots:** disabled button; show 🔒 and the **claimer's email** displayed directly under the option label (in the dialog).
@@ -206,12 +213,13 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 - If email matches an active `sessions` row → auto-login with that slot; **do not** show the dialog.
 - If saved local session slot is no longer valid (another email claimed it) → clear session, show dialog again.
 
-**Returning** `mentor` **keyword users:**
+**Returning** `mentor` **and** `previous` **keyword users:**
 
 - If identifier `mentor` matches active `sessions` row for `role:mentor` → auto-login as Mentor; **do not** show the dialog.
-- If the Mentor slot is held by another identifier → toast error; remain on auth screen.
+- If identifier `previous` matches active `sessions` row for `role:previous` → auto-login as Previous; **do not** show the dialog.
+- If that role slot is held by another identifier → toast error; remain on auth screen.
 
-**Logout** does **not** release the slot; the same email (or `mentor` identifier) can return to the same assignment.
+**Logout** does **not** release the slot; the same email (or `mentor` / `previous` identifier) can return to the same assignment.
 
 ### 4.3 Team representative (team slot)
 
@@ -223,30 +231,48 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 
 
 
-### 4.4 Mentor (role slot, keyword login)
+### 4.4 Keyword scoring roles (Mentor and Previous)
 
-- Entered by typing `mentor` in the login field and tapping **Continue** (§4.1). **No assignment picker** and **no** `@` validation for this exact string.
-- On first login: claim `role:mentor` in `sessions` with identifier `mentor` and display name "Mentor".
-- On return: restore the Mentor slot if still owned by `mentor`; same race/lock rules as email slot claims (§4.2).
+Mentor and Previous are numeric scoring roles with separate slots, identifiers, and `from_team` labels. Submit/undo behavior is the same; **per-team maximum differs by role** (§3.2).
+
+**Shared rules (both roles):**
+
+- Entered by typing the reserved keyword in the login field and tapping **Continue** (§4.1). **No assignment picker** and **no** `@` validation for that exact string.
+- On first login: claim `role:{id}` in `sessions` with the keyword as identifier and the role display name.
+- On return: restore that role slot if still owned by the same identifier; same race/lock rules as email slot claims (§4.2).
+- **Role scoring panel** in the main app (§8.5) — numeric entry per team (§3.2). Title, hint, validation max, and `from_team` follow the logged-in role.
+- **Submit/Undo** disabled while the Winner announcement overlay is displayed (§8.9).
+
+**Mentor (**`mentor`**):**
+
+- Keyword `mentor`; identifier `mentor`; display name "Mentor"; avatar 🎓.
 - Holds `role:mentor` slot.
-- **Mentor scoring panel** in the main app (§8.5) — numeric entry 0–8,000 per team (§3.2).
-- Mentor **Submit/Undo** disabled while the Winner announcement overlay is displayed (§8.9).
-- User bar shows "Mentor" with 🎓 avatar.
+- Vote rows use `from_team = 'Mentor'`.
+- User bar shows "🎓 Mentor".
+- **Per-team maximum 8,000** marks.
+
+**Previous (**`previous`**):**
+
+- Keyword `previous`; identifier `previous`; display name "Previous"; avatar ⏮️.
+- Holds `role:previous` slot.
+- Vote rows use `from_team = 'Previous'`.
+- User bar shows "⏮️ Previous".
+- **Per-team maximum 10,000** marks (vs Mentor's 8,000); same submit/undo and lock behavior otherwise.
 
 
 
 ### 4.5 Interactive (reserved login keyword)
 
 - Entered by typing `interactive` in the login field and tapping **Continue** (§4.1). **No assignment slot** and **no** `@` validation for this exact string.
-- **Display viewport:** all Interactive UI (user bar + event screens, §8.8) is constrained to a maximum **3840 × 2160** pixel area, centered on larger displays.
-- **Read-only:** no voting or scoring UI for the Interactive operator — team vote UI, Mentor panel, and assignment picker remain hidden.
+- **Display viewport:** Interactive mode uses the browser viewport (`100dvh`). During the **QR voting screen** (Phase 2), caption + QR frame + status/done controls are **dynamically scaled** to fit the remaining area below the user bar and page header — **no page scroll** required to reveal hidden content (§8.8).
+- **Read-only:** no voting or scoring UI for the Interactive operator — team vote UI, role scoring panel (Mentor / Previous), and assignment picker remain hidden.
 - User bar: avatar 📺, name "Interactive", pill "📺 Interactive".
 - Receives realtime / polling updates.
 - **No** row in `sessions`; **no** votes persisted. Logout clears local interactive session only.
 - **Audio preload (login):** on Interactive login, **preload all MP3 assets** used in this mode (`sounds/vote_bgm.mp3`, `sounds/champion.mp3`, `sounds/done_vote.mp3`, `sounds/drum_roll.mp3`) into the browser cache. **Do not start playback** until the user taps **Let's go!** (§8.8).
 - **Two-phase event display (§8.8):**
   1. **Ready screen** — large colorful caption **"Are you ready to vote?"** and tappable **"Let's go!"** button.
-  2. **Voting screen** — on **Let's go!** tap: cross-fade from ready screen to voting screen; **start looping** `sounds/vote_bgm.mp3`; show large centered QR code (`images/vote-qr-code.png`) with decorative frame; animated caption **"Voting in progress..."** below the QR.
+  2. **Voting screen** — on **Let's go!** tap: cross-fade from ready screen to voting screen; **start looping** `sounds/vote_bgm.mp3`; show large centered QR code (`images/vote-qr-code.png`) with decorative frame; animated caption **"Voting in progress..."** below the QR. Content **auto-scales** to fit the viewport (§8.8).
 - **Winner announcement (§8.9):** opened from the **"Voting is done! And the winner is..."** button (§8.8). **Fade out** any playing `vote_bgm.mp3` over 1 second, then open winner overlay; play `sounds/drum_roll.mp3` once during the suspense leaderboard, then loop `champion.mp3` when the winner caption appears (§10).
 
 
@@ -272,12 +298,12 @@ Immediately after email sign-in (or when a returning email user has no valid sav
 Locks an assignment slot to an email. **One row per slot; one slot per user.**
 
 
-| Column      | Type        | Notes                                                                                                                                                            |
-| ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `slot_key`  | text (PK)   | e.g. `team:1`, `role:mentor` (see §2.3)                                                                                                                          |
-| `email`     | text        | Owner identifier — real voter email, or literal `mentor` for keyword login (§4.4). Interactive has no row. |
-| `name`      | text        | Display name                                                                                                                                                     |
-| `locked_at` | timestamptz | Default `now()`                                                                                                                                                  |
+| Column      | Type        | Notes                                                                                                                   |
+| ----------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `slot_key`  | text (PK)   | e.g. `team:1`, `role:mentor`, `role:previous` (see §2.3)                                                                |
+| `email`     | text        | Owner identifier — real voter email, or literal `mentor` / `previous` for keyword login (§4.4). Interactive has no row. |
+| `name`      | text        | Display name                                                                                                            |
+| `locked_at` | timestamptz | Default `now()`                                                                                                         |
 
 
 **Suggested SQL (new system):**
@@ -299,15 +325,15 @@ Legacy `index.html.bak` used `team_id int` PK — migrate or replace for the slo
 All score events from every assignment type.
 
 
-| Column        | Type        | Notes                                                                     |
-| ------------- | ----------- | ------------------------------------------------------------------------- |
-| `id`          | serial (PK) |                                                                           |
-| `voter_email` | text        | Voter's email                                                             |
-| `voter_name`  | text        | Display name                                                              |
-| `from_team`   | text        | Source team name (`Team 1`…) or role label (`Mentor`) |
-| `to_team_id`  | int         | Target team 1–4                                                           |
-| `points`      | int         | Point amount                                                              |
-| `created_at`  | timestamptz | Default `now()`                                                           |
+| Column        | Type        | Notes                                                             |
+| ------------- | ----------- | ----------------------------------------------------------------- |
+| `id`          | serial (PK) |                                                                   |
+| `voter_email` | text        | Voter's email                                                     |
+| `voter_name`  | text        | Display name                                                      |
+| `from_team`   | text        | Source team name (`Team 1`…) or role label (`Mentor`, `Previous`) |
+| `to_team_id`  | int         | Target team 1–4                                                   |
+| `points`      | int         | Point amount                                                      |
+| `created_at`  | timestamptz | Default `now()`                                                   |
 
 
 `from_team` **values by assignment:**
@@ -317,12 +343,13 @@ All score events from every assignment type.
 | ---------- | ----------------------------------------- |
 | Team 1–4   | `Team 1`, `Team 2`, … (voter's team name) |
 | Mentor     | `Mentor`                                  |
+| Previous   | `Previous`                                |
 
 
 **Persistence rules:**
 
 - **Team rep:** one row per `voter_email` total (single active vote). **Undo** deletes the row; user may confirm a new vote for a different team. Disabled while winner announcement is displayed.
-- **Mentor numeric:** one row per `voter_email` + `to_team_id` + `from_team = 'Mentor'`. **Undo** deletes the row. No in-place amend — undo then re-submit. Disabled while winner announcement is displayed.
+- **Role numeric (Mentor / Previous):** one row per `voter_email` + `to_team_id` + `from_team` (`'Mentor'` or `'Previous'`). **Undo** deletes the row. No in-place amend — undo then re-submit. Disabled while winner announcement is displayed.
 
 
 
@@ -331,9 +358,9 @@ All score events from every assignment type.
 Singleton row gating vote/score edits while the Winner announcement overlay is open.
 
 
-| Column             | Type     | Notes                                   |
-| ------------------ | -------- | --------------------------------------- |
-| `id`               | int (PK) | Always `1` (check constraint)           |
+| Column             | Type     | Notes                                  |
+| ------------------ | -------- | -------------------------------------- |
+| `id`               | int (PK) | Always `1` (check constraint)          |
 | `winner_announced` | boolean  | `true` while §8.9 overlay is displayed |
 
 
@@ -378,17 +405,17 @@ alter publication supabase_realtime add table event_state;
 ## 6. Client State
 
 
-| Variable          | Type                                                      | Description                                                                                                                                                                                                |
-| ----------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `currentUser`     | `{name, email, avatar, slot?, isInteractive?}` | `slot` when assigned (`team:N` or `role:mentor` for keyword login); `email` may be a real address, `interactive`, or `mentor`; `isInteractive: true` (§4.5) for read-only entry |
-| `votes`           | `{teamId: total}`                                         | Running totals per team                                                                                                                                                                                    |
-| `voteLog`         | array                                                     | Vote rows for running totals and winner announcement                                                                                                                                                       |
-| `myTeamVote`      | `{teamId, confirmed}` or `null`                           | Team rep's single vote (§3.1)                                                                                                                                                                              |
-| `myRoleScores`    | `{teamId: points}`                                        | Mentor keyword user's numeric Mentor scores (§3.2)                                                                                                                                                         |
-| `takenSlots`      | `{slotKey: email}`                                        | Active session locks for all 5 options                                                                                                                                                                     |
-| `roleScoreDrafts` | `{teamId: string}`                                        | In-progress role score inputs                                                                                                                                                                              |
-| `ourVoteIds`      | Set                                                       | Dedup own inserts from realtime                                                                                                                                                                            |
-| `winnerAnnounced` | boolean                                                   | `true` when Winner announcement overlay is open (§8.9); synced from `event_state`                                                                                                                         |
+| Variable          | Type                                           | Description                                                                                                                                                                                                   |
+| ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `currentUser`     | `{name, email, avatar, slot?, isInteractive?}` | `slot` when assigned (`team:N`, `role:mentor`, or `role:previous` for keyword login); `email` may be a real address, `interactive`, `mentor`, or `previous`; `isInteractive: true` (§4.5) for read-only entry |
+| `votes`           | `{teamId: total}`                              | Running totals per team                                                                                                                                                                                       |
+| `voteLog`         | array                                          | Vote rows for running totals and winner announcement                                                                                                                                                          |
+| `myTeamVote`      | `{teamId, confirmed}` or `null`                | Team rep's single vote (§3.1)                                                                                                                                                                                 |
+| `myRoleScores`    | `{teamId: points}`                             | Keyword role user's numeric scores (§3.2) — Mentor or Previous                                                                                                                                                |
+| `takenSlots`      | `{slotKey: email}`                             | Active session locks for all 6 options                                                                                                                                                                        |
+| `roleScoreDrafts` | `{teamId: string}`                             | In-progress role score inputs                                                                                                                                                                                 |
+| `ourVoteIds`      | Set                                            | Dedup own inserts from realtime                                                                                                                                                                               |
+| `winnerAnnounced` | boolean                                        | `true` when Winner announcement overlay is open (§8.9); synced from `event_state`                                                                                                                             |
 
 
 
@@ -396,7 +423,7 @@ alter publication supabase_realtime add table event_state;
 ### 6.1 Session persistence (localStorage)
 
 - Key: `lv_session_v2`
-- Fields: `{ email, name, slotKey }` for assigned users — e.g. `team:2` or `role:mentor` (with `email: "mentor"`).
+- Fields: `{ email, name, slotKey }` for assigned users — e.g. `team:2`, `role:mentor` (with `email: "mentor"`), or `role:previous` (with `email: "previous"`).
 - Interactive: `{ isInteractive: true, votingStarted?: boolean }` — `votingStarted: true` after **Let's go!** (§8.8); restored on reload to skip ready screen
 - Restored on page load via `tryRestoreSession()`
 - Cleared on logout; abandoned if slot claimed by another email
@@ -518,15 +545,15 @@ Use CSS custom properties. Team accent colors (§2.1) stay; surround them with a
 ### 7.5 Motion & interaction catalog
 
 
-| Interaction                 | Animation                                                        |
-| --------------------------- | ---------------------------------------------------------------- |
-| Button tap                  | Press-in shadow + `scale(0.97)`                                  |
-| Team card tap (pre-confirm) | Bounce + highlight ring                                          |
-| Vote confirmed              | Star burst from card + coin pop sound                              |
-| Score submitted             | Coin / point pop chime + mini star burst particles                 |
-| New leader                  | Confetti on winner announcement open (§8.9)                        |
-| Modal open                  | Scale from `0.9` with overshoot ease                             |
-| Locked slot                 | Gentle shake if user taps taken assignment                       |
+| Interaction                 | Animation                                          |
+| --------------------------- | -------------------------------------------------- |
+| Button tap                  | Press-in shadow + `scale(0.97)`                    |
+| Team card tap (pre-confirm) | Bounce + highlight ring                            |
+| Vote confirmed              | Star burst from card + coin pop sound              |
+| Score submitted             | Coin / point pop chime + mini star burst particles |
+| New leader                  | Confetti on winner announcement open (§8.9)        |
+| Modal open                  | Scale from `0.9` with overshoot ease               |
+| Locked slot                 | Gentle shake if user taps taken assignment         |
 
 
 Prefer CSS transitions/keyframes for UI; canvas only for confetti/particles (optional).
@@ -543,13 +570,13 @@ Prefer CSS transitions/keyframes for UI; canvas only for confetti/particles (opt
 ### 7.7 Theme vs. legacy (`index.html.bak`)
 
 
-| Aspect     | Legacy               | Cartoon Game Leaderboard          |
-| ---------- | -------------------- | --------------------------------- |
-| Background | Dark `#0a0e1a` space | Bright sky / playfield            |
-| Fonts      | Orbitron, Rajdhani   | Fredoka/Bangers + Nunito          |
-| Buttons    | Flat gradient sci-fi | Chunky bordered “sticker” buttons |
+| Aspect     | Legacy               | Cartoon Game Leaderboard           |
+| ---------- | -------------------- | ---------------------------------- |
+| Background | Dark `#0a0e1a` space | Bright sky / playfield             |
+| Fonts      | Orbitron, Rajdhani   | Fredoka/Bangers + Nunito           |
+| Buttons    | Flat gradient sci-fi | Chunky bordered “sticker” buttons  |
 | #1 effect  | Neon spotlight cone  | Winner announcement overlay (§8.9) |
-| Overall    | Cyber trophy room    | Arcade party game scoreboard      |
+| Overall    | Cyber trophy room    | Arcade party game scoreboard       |
 
 
 ---
@@ -567,8 +594,9 @@ All surfaces in this section must implement §7 (Cartoon Game Leaderboard theme)
   - Valid **email address** (`@` present) → assignment picker (**Team 1–4 only**)
   - Reserved keyword `interactive` (exact, case-insensitive) → Interactive mode (§4.5)
   - Reserved keyword `mentor` (exact, case-insensitive) → Mentor mode (§4.4); claims `role:mentor`; Mentor scoring UI (§8.5)
+  - Reserved keyword `previous` (exact, case-insensitive) → Previous mode (§4.4); claims `role:previous`; Previous scoring UI (§8.5)
   - Invalid (no `@` and not a keyword) → error toast
-- **No visible hints** for `interactive` or `mentor` on the auth screen
+- **No visible hints** for `interactive`, `mentor`, or `previous` on the auth screen
 - Title: "PROJECT FARMER KEYNOTE DAY 2026-07-18 VOTING SYSTEM" in display font (three lines on auth screen: PROJECT FARMER / KEYNOTE DAY 2026-07-18 / VOTING SYSTEM)
 - Trophy 🏆 hero icon with gentle float animation
 - Sign-in card: cream panel on sky background
@@ -577,7 +605,7 @@ All surfaces in this section must implement §7 (Cartoon Game Leaderboard theme)
 
 ### 8.2 Assignment picker dialog
 
-- **Email users only** — not shown for `interactive` or `mentor` keyword entry (§4.1).
+- **Email users only** — not shown for `interactive`, `mentor`, or `previous` keyword entry (§4.1).
 - **Mandatory** on first email login (unless returning user with valid slot); styled as §7.4 game panel modal.
 - **Teams only:** 4 buttons (Team 1–4), 2×2 grid or similar. **No role section.**
 - Dialog title: "SELECT YOUR TEAM" (not "assignment").
@@ -612,9 +640,9 @@ Shown only for `team:N` assignments. **No numeric input or keypad.**
 
 
 
-### 8.5 Mentor scoring UI
+### 8.5 Role scoring UI (Mentor and Previous)
 
-Shown only for `mentor` keyword login (`role:mentor`). **Must be visible** (`display: block`) when a Mentor is logged in — hidden for team reps and Interactive.
+Shown for `mentor` keyword login (`role:mentor`) **or** `previous` keyword login (`role:previous`). **Must be visible** (`display: block`) when either role is logged in — hidden for team reps and Interactive. Panel title, aria labels, and persisted `from_team` follow the logged-in role (🎓 Mentor vs ⏮️ Previous).
 
 Single cream game panel in the main app (§7.4):
 
@@ -622,8 +650,8 @@ Single cream game panel in the main app (§7.4):
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🎓 Mentor Scoring                                           │
-│  Enter 0–8,000 mentor marks per team and submit.             │
+│  🎓 Mentor Scoring   (or ⏮️ Previous Scoring)                │
+│  Enter marks per team and submit (0–8,000 Mentor / 0–10,000 Previous). │
 │                                                              │
 │  🔥 Team 1   [ 1500 ]  [ Submit ]                            │
 │  ⚡ Team 2   [  800 ]  [ Undo  ]  (locked)                   │
@@ -635,17 +663,17 @@ Single cream game panel in the main app (§7.4):
 Per-team row (four rows):
 
 1. **Team label** — emoji + name + left accent stripe in team color.
-2. **Score input** — large centered numeric field; `0–8,000` validation (clamp or warn above max).
-3. **Submit** (unsubmitted rows) — persist that team's Mentor score; lock input; switch button to **Undo**.
-4. **Undo** (submitted rows) — delete that team's Mentor vote row; unlock input. **Disabled** while Winner announcement is displayed (§8.9).
-5. **Saved indicator** — when locked, show `Saved: N` under the team name (visible to Mentor only).
+2. **Score input** — large centered numeric field; per-role validation (`0–8,000` Mentor, `0–10,000` Previous; clamp or warn above max).
+3. **Submit** (unsubmitted rows) — persist that team's role score; lock input; switch button to **Undo**.
+4. **Undo** (submitted rows) — delete that team's role vote row; unlock input. **Disabled** while Winner announcement is displayed (§8.9).
+5. **Saved indicator** — when locked, show `Saved: N` under the team name (visible to that role user only).
 
 - Enter key in an unlocked input submits that row.
 - No batch submit.
 
-**While Winner announcement displayed:** all Mentor **Submit** / **Undo** disabled; hint text notes scoring is locked.
+**While Winner announcement displayed:** all role **Submit** / **Undo** disabled; hint text notes scoring is locked.
 
-**Returning users:** pre-fill and lock Mentor numeric rows from `myRoleScores` (unless announcement is displayed).
+**Returning users:** pre-fill and lock numeric rows from `myRoleScores` (unless announcement is displayed).
 
 ### 8.6 Toast notifications
 
@@ -669,11 +697,19 @@ Shown only for `interactive` keyword login (§4.5). Replaces the main voting/sco
 
 **Viewport constraint:**
 
-- Entire Interactive layout (`#main-app.interactive-mode`) is capped at **3840 px** wide and **2160 px** tall (`INTERACTIVE_MAX_W`, `INTERACTIVE_MAX_H`), centered horizontally on ultra-wide displays; content scales down within the viewport on smaller screens.
+- `#main-app.interactive-mode` fills `100dvh` with `overflow: hidden` — the page must not scroll while Interactive is active.
+- User bar and page title header remain visible; `#interactive-display` fills the remaining height (`flex: 1; min-height: 0`).
 
-**Hidden for Interactive:** team vote section (§8.4), Mentor panel (§8.5), assignment picker. Page title header (§8.3 area) **remains visible**.
+**Phase 2 — dynamic fit (no scroll):**
 
-**Phase 1 — Ready screen (`#interactive-ready`):**
+- QR voting content lives in `#interactive-voting-scale` inside `.interactive-voting-scale-host` (flex-centered, `overflow: hidden`).
+- `fitInteractiveVotingScale()` measures the host’s available width/height vs the inner block’s natural size, then applies `transform: scale(...)` (max **1.0**) via a wrapper so the full stack — instruction, QR frame + decorations, status caption, and done button — always fits.
+- Re-run on: voting screen activate, window resize, `ResizeObserver` on the host, QR image load, font load, and when the done button replaces the progress caption.
+- Design-time inner width is fixed (~920 px); scale shrinks on short/narrow viewports rather than clipping or scrolling.
+
+**Hidden for Interactive:** team vote section (§8.4), role scoring panel (§8.5), assignment picker. Page title header (§8.3 area) **remains visible**.
+
+**Phase 1 — Ready screen (**`#interactive-ready`**):**
 
 ```
 ┌────────────────────────────────────────────┐
@@ -686,12 +722,12 @@ Shown only for `interactive` keyword login (§4.5). Replaces the main voting/sco
 └────────────────────────────────────────────┘
 ```
 
-- Shown immediately after Interactive login (unless session restored with `votingStarted: true`). **`#interactive-ready` is hidden for all non-Interactive users.**
+- Shown immediately after Interactive login (unless session restored with `votingStarted: true`). `#interactive-ready` **is hidden for all non-Interactive users.**
 - Caption: exact copy **"Are you ready to vote?"** — warm gradient (orange → gold → cream) with ink accents; avoids cool blues/teals that clash with the sky background (§7).
 - **Let's go!** button: primary chunky CTA; single tap advances to Phase 2.
 - No background music during this phase (MP3 assets preloaded only).
 
-**Phase 2 — Voting screen (`#interactive-voting`):**
+**Phase 2 — Voting screen (**`#interactive-voting`**):**
 
 ```
 ┌────────────────────────────────────────────┐
@@ -712,6 +748,7 @@ Shown only for `interactive` keyword login (§4.5). Replaces the main voting/sco
 ```
 
 - **Transition:** on **Let's go!** tap, fade out Phase 1 (~400 ms) and fade in Phase 2 (~400 ms).
+- **Dynamic scaling:** Phase 2 content must **never** overflow the available viewport — scale down as needed so caption, QR, and status/done controls are fully visible without scrolling (see **Phase 2 — dynamic fit** above).
 - **Instruction above QR:** exact copy **"Scan the QR Code below and start voting."**
 - **QR code:** `images/vote-qr-code.png`, large and centered; chunky frame with **animated glow ring**, plus decorative emoji accents (corners and sides). **Animated background** behind the voting screen: shifting color gradients, soft drifting blobs, slow rotating light rays, and twinkling sparkles (cartoon game style, §7).
 - **Audio:** start looping `sounds/vote_bgm.mp3` at the same time Phase 2 fades in (user gesture satisfies autoplay policy).
@@ -719,9 +756,12 @@ Shown only for `interactive` keyword login (§4.5). Replaces the main voting/sco
 - **Completion detection:** voting is **complete** when all of the following are satisfied in the current `voteLog` / DB state:
   - Each of the **4 team slots** has cast its team-rep vote (`from_team` = `Team 1` … `Team 4`, one row each).
   - **Mentor** has submitted a score for **all 4 teams** (`from_team = 'Mentor'`, one row per target team).
+  - **Previous** has submitted a score for **all 4 teams** (`from_team = 'Previous'`, one row per target team).
 - **Done control:** when complete, wait **5 seconds** (`INTERACTIVE_VOTING_DONE_MS`) with **no undo** (no vote `DELETE` that breaks completeness); then hide the status caption and show a large colorful animated button: **"Voting is done! And the winner is..."**. Tapping the button opens the Winner announcement overlay (§8.9). Any undo during the wait or after done reverts to **"Voting in progress..."**, restarts the 5-second stability window once complete again, and resumes `vote_bgm.mp3`.
 - **Done audio:** when the done button appears, **stop** looping `sounds/vote_bgm.mp3` and **play once** `sounds/done_vote.mp3` (preloaded on login).
 - Persists `votingStarted: true` in localStorage so reload skips Phase 1.
+
+
 
 ### 8.9 Winner announcement (Interactive only)
 
@@ -764,7 +804,7 @@ Full-screen overlay opened from the **"Voting is done! And the winner is..."** b
 └────────────────────────────────────────────┘
 ```
 
-**Caption** (exact copy; team line lists one winner or all tied winners joined with `, ` / ` & `, e.g. `🔥 Team 1 & ⚡ Team 2`):
+**Caption** (exact copy; team line lists one winner or all tied winners joined with `,`  / `&`, e.g. `🔥 Team 1 & ⚡ Team 2`):
 
 ```
 Congratulations to
@@ -825,11 +865,11 @@ For winning today's keynote day!
 Cartoon-game flavored effects — playful, not sci-fi. Align with §7.8 motion catalog.
 
 
-| Event               | Effect                                                                   |
-| ------------------- | ------------------------------------------------------------------------ |
+| Event               | Effect                                             |
+| ------------------- | -------------------------------------------------- |
 | Team vote confirmed | Star burst from card + cheerful whoosh (Web Audio) |
 | Score submitted     | Coin / point pop chime + mini star burst particles |
-| Winner announcement | Confetti burst (8s auto-stop, `FW_DURATION_MS`)      |
+| Winner announcement | Confetti burst (8s auto-stop, `FW_DURATION_MS`)    |
 
 
 **Synthesized UI sounds** (Web Audio): vote whoosh, coin pop — see table above. `AudioContext` resumed on first user gesture. Prefer bright sine/triangle tones (coin pickup, level-up) over dark sawtooth whoosh.
@@ -837,14 +877,14 @@ Cartoon-game flavored effects — playful, not sci-fi. Align with §7.8 motion c
 **MP3 loops (Interactive mode only):**
 
 
-| When                             | Asset                 | Behavior                                                                                        |
-| -------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------- |
-| Interactive login                | `sounds/vote_bgm.mp3`, `sounds/champion.mp3`, `sounds/done_vote.mp3`, `sounds/drum_roll.mp3` | Preload all on login; **no playback** until **Let's go!** (§8.8)                               |
-| Interactive voting screen (§8.8) | `sounds/vote_bgm.mp3`                                                | Loop until voting done (§8.8) or logout                                                        |
-| Voting complete (§8.8)           | `sounds/done_vote.mp3`                                               | Stop `vote_bgm.mp3`; play **once** when done button appears                                    |
-| Winner announcement suspense (§8.9) | `sounds/drum_roll.mp3`                                            | Fade out `vote_bgm.mp3` over 1s; open overlay; play **once** when bar animation starts         |
-| Winner caption reveal (§8.9)     | `sounds/champion.mp3`                                                | After **2.5 s** hold on settled leaderboard, loop until overlay closed                         |
-| Winner announcement closed       | —                     | Stop `champion.mp3` and `drum_roll.mp3`; do **not** resume `vote_bgm.mp3`                      |
+| When                                | Asset                                                                                        | Behavior                                                                               |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Interactive login                   | `sounds/vote_bgm.mp3`, `sounds/champion.mp3`, `sounds/done_vote.mp3`, `sounds/drum_roll.mp3` | Preload all on login; **no playback** until **Let's go!** (§8.8)                       |
+| Interactive voting screen (§8.8)    | `sounds/vote_bgm.mp3`                                                                        | Loop until voting done (§8.8) or logout                                                |
+| Voting complete (§8.8)              | `sounds/done_vote.mp3`                                                                       | Stop `vote_bgm.mp3`; play **once** when done button appears                            |
+| Winner announcement suspense (§8.9) | `sounds/drum_roll.mp3`                                                                       | Fade out `vote_bgm.mp3` over 1s; open overlay; play **once** when bar animation starts |
+| Winner caption reveal (§8.9)        | `sounds/champion.mp3`                                                                        | After **2.5 s** hold on settled leaderboard, loop until overlay closed                 |
+| Winner announcement closed          | —                                                                                            | Stop `champion.mp3` and `drum_roll.mp3`; do **not** resume `vote_bgm.mp3`              |
 
 
 Use HTML5 `Audio` with `loop: true` for BGM and `preload: auto`. On Interactive login, call `preloadInteractiveSounds()` to buffer `vote_bgm.mp3`, `champion.mp3`, `done_vote.mp3`, and `drum_roll.mp3` **without playing**. Reuse cached `Audio` elements for `startVoteBgm()` (on **Let's go!**, §8.8), `playDoneVoteSound()` (voting complete, §8.8), `playDrumRollSound()` (suspense leaderboard, §8.9), and `startChampionBgm()` (winner caption, §8.9). Release cached elements on Interactive logout; stop champion, drum_roll, and done_vote audio on overlay close / logout.
@@ -859,22 +899,25 @@ Use HTML5 `Audio` with `loop: true` for BGM and `preload: auto`. On Interactive 
 TEAM_VOTE_PTS         = 1000   // fixed marks for team rep single vote
 MENTOR_MIN_PTS        = 0
 MENTOR_MAX_PTS        = 8000   // per team, Mentor numeric scoring
+PREVIOUS_MIN_PTS      = 0
+PREVIOUS_MAX_PTS      = 10000  // per team, Previous numeric scoring
 FW_DURATION_MS        = 8000     // confetti burst duration
 POLL_MS               = 4000     // polling fallback interval
 VOTE_BGM_FADE_MS      = 1000     // vote BGM fade-out before winner overlay (§8.9)
-INTERACTIVE_MAX_W     = 3840     // max Interactive viewport width (§8.8)
-INTERACTIVE_MAX_H     = 2160     // max Interactive viewport height (§8.8)
+INTERACTIVE_MAX_W     = 3840     // design reference width (optional cap for ultra-wide)
+INTERACTIVE_MAX_H     = 2160     // design reference height (optional cap for ultra-wide)
 INTERACTIVE_QR_IMAGE  = 'images/vote-qr-code.png'
 INTERACTIVE_VOTING_DONE_MS = 5000   // stability window before done button (§8.8)
 STORAGE_KEY           = 'lv_session_v2'
 INTERACTIVE_EMAIL     = 'interactive'  // reserved login keyword (§4.5)
 MENTOR_EMAIL          = 'mentor'       // reserved login keyword (§4.4)
+PREVIOUS_EMAIL        = 'previous'     // reserved login keyword (§4.4)
 USE_SUPABASE          = true
 
 TEAMS = [ /* 4 teams — see §2.1 */ ]
-ROLES = [ /* 1 role — see §2.2 */ ]
+ROLES = [ /* 2 roles — Mentor and Previous, see §2.2 */ ]
 SLOT_KEYS = [ 'team:1', 'team:2', 'team:3', 'team:4',
-              'role:mentor' ]
+              'role:mentor', 'role:previous' ]
 ```
 
 Supabase credentials: `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key).
@@ -885,14 +928,14 @@ Supabase credentials: `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key).
 
 ## 12. Constraints & Edge Cases
 
-1. **One slot per email user:** an email user may hold only one team slot (`team:1`–`team:4`); enforced by unique email index and UI. `mentor` keyword login holds `role:mentor` under identifier `mentor`.
+1. **One slot per email user:** an email user may hold only one team slot (`team:1`–`team:4`); enforced by unique email index and UI. `mentor` keyword login holds `role:mentor` under identifier `mentor`. `previous` keyword login holds `role:previous` under identifier `previous`.
 2. **One user per slot:** once claimed, slot locked; other users see email under that option in the assignment dialog.
 3. **Team rep — one active vote:** after confirm, other cards locked; **Undo Vote** deletes row and allows a new choice. Disabled while Winner announcement is displayed (§8.9).
 4. **Team rep — cannot vote for self:** own team card is locked and never opens the confirmation dialog.
 5. **Team rep — fixed 1,000:** no variable amount; `points` always `1000` in DB.
-6. **Mentor numeric — per-team cap:** reject or clamp scores outside 0–8,000.
-7. **Mentor numeric score changes:** undo deletes row; must re-submit (no in-place edit). Disabled while Winner announcement is displayed (§8.9).
-8. **Winner announcement lock:** while §8.9 overlay is open (`event_state.winner_announced = true`), all team **Undo Vote** and Mentor **Submit** / **Undo** controls are disabled on every client.
+6. **Role numeric — per-team cap:** reject or clamp scores outside the role's range (Mentor 0–8,000; Previous 0–10,000).
+7. **Role numeric score changes:** undo deletes row; must re-submit (no in-place edit). Disabled while Winner announcement is displayed (§8.9).
+8. **Winner announcement lock:** while §8.9 overlay is open (`event_state.winner_announced = true`), all team **Undo Vote** and role **Submit** / **Undo** controls are disabled on every client.
 9. **Race on slot claim:** check existing session before insert; refresh dialog on failure.
 10. **Logout ≠ unlock:** session row stays so email can return; other emails blocked.
 11. **UI updates during editing:** scoring UI frozen while confirmation dialog open or role inputs active.
@@ -919,7 +962,7 @@ Supabase credentials: `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key).
 - No live standings chart, vote status board, or champion banner (removed)
 - No admin dashboard separate from the app
 - No vote audit export
-- No authentication beyond email string or reserved login keywords (`interactive`, `mentor`)
+- No authentication beyond email string or reserved login keywords (`interactive`, `mentor`, `previous`)
 - No automatic session expiry / slot release
 - RLS is wide open (demo mode)
 - No secret admin edit panel (removed from original keypad model)
@@ -931,11 +974,12 @@ Supabase credentials: `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key).
 ## 15. File Reference
 
 
-| File              | Role                                                  |
-| ----------------- | ----------------------------------------------------- |
-| `index.html.bak`  | Original full implementation (archived; 6-team model) |
-| `CNAME`           | Custom domain for GitHub Pages                        |
-| `SCORING_SPEC.md` | This document                                         |
+| File              | Role                                                         |
+| ----------------- | ------------------------------------------------------------ |
+| `index.html`      | Live SPA shell (auth, assignment picker, role scoring panel) |
+| `index.html.bak`  | Original full implementation (archived; 6-team model)        |
+| `CNAME`           | Custom domain for GitHub Pages                               |
+| `SCORING_SPEC.md` | This document                                                |
 
 
 ---
@@ -945,23 +989,25 @@ Supabase credentials: `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key).
 ## 16. Changelog from `index.html.bak`
 
 
-| Area               | Old                                 | New                                                                                                   |
-| ------------------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Teams              | 6 teams                             | 4 teams (Team 1–4)                                                                                    |
-| Post-login         | Team picker or Viewer               | Email → team picker (4 teams only); `mentor` keyword → Mentor scoring UI                                |
-| Assignments        | Team or Viewer                      | 5 slots in DB (4 teams + Mentor role); email users pick teams only; Mentor via `mentor` keyword       |
-| Roles              | None                                | Mentor (single `mentor` keyword login, §8.5)                                                          |
-| Viewer mode        | Explicit button on auth screen      | **Removed** — use `interactive` keyword for read-only display (§4.5)                                  |
+| Area               | Old                                 | New                                                                                                                    |
+| ------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Teams              | 6 teams                             | 4 teams (Team 1–4)                                                                                                     |
+| Post-login         | Team picker or Viewer               | Email → team picker (4 teams only); `mentor` / `previous` keywords → role scoring UI                                   |
+| Assignments        | Team or Viewer                      | 6 slots in DB (4 teams + Mentor + Previous); email users pick teams only; roles via keywords                           |
+| Roles              | None                                | Mentor (`mentor` keyword, 0–8,000) and Previous (`previous` keyword, 0–10,000) numeric scoring (§8.5)                  |
+| Viewer mode        | Explicit button on auth screen      | **Removed** — use `interactive` keyword for read-only display (§4.5)                                                   |
 | Interactive mode   | —                                   | Reserved keyword `interactive` + Continue; two-phase event display (§8.8), BGM on **Let's go!**, winner overlay (§8.9) |
-| Mentor entry       | —                                   | Reserved keyword `mentor` + Continue; claims `role:mentor`; Mentor scoring panel (§8.5)                 |
-| Session PK         | `team_id` int                       | `slot_key` text                                                                                       |
-| Chart labels       | Team name only                      | *(removed — no live standings chart)*                                                                 |
-| Vote status board  | Participation matrix                | *(removed)*                                                                                           |
-| Dialog taken state | "🔒 Taken" only                     | 🔒 + claimer email under option                                                                       |
-| Team rep voting    | Up to 5 votes, 1–5,000 each, keypad | **1 active vote**, fixed **1,000**, tap + confirm + **Undo Vote** (locked during winner announcement) |
-| Mentor             | Observer only                       | **0–8,000** per team via Mentor UI (§8.5)                                                             |
-| Bonus layer        | Separate `__BONUS__` sentinel       | Removed; all scores in `votes` table                                                                  |
-| Score entry        | Keypad for team reps                | Tap-to-vote (team reps); numeric inputs (Mentor marks only, §8.5)                                     |
-| Visual theme       | Dark sci-fi (Orbitron, neon)        | **Cartoon Game Leaderboard** (§7) — sky bg, chunky UI, Fredoka/Nunito                                 |
+| Mentor entry       | —                                   | Reserved keyword `mentor` + Continue; claims `role:mentor`; Mentor scoring panel (§8.5)                                |
+| Previous entry     | —                                   | Reserved keyword `previous` + Continue; claims `role:previous`; same scoring UI as Mentor with 10,000 max (§8.5)       |
+| Session PK         | `team_id` int                       | `slot_key` text                                                                                                        |
+| Chart labels       | Team name only                      | *(removed — no live standings chart)*                                                                                  |
+| Vote status board  | Participation matrix                | *(removed)*                                                                                                            |
+| Dialog taken state | "🔒 Taken" only                     | 🔒 + claimer email under option                                                                                        |
+| Team rep voting    | Up to 5 votes, 1–5,000 each, keypad | **1 active vote**, fixed **1,000**, tap + confirm + **Undo Vote** (locked during winner announcement)                  |
+| Mentor             | Observer only                       | **0–8,000** per team via role UI (§8.5)                                                                                |
+| Previous           | —                                   | **0–10,000** per team via same role UI as Mentor (§8.5)                                                                |
+| Bonus layer        | Separate `__BONUS__` sentinel       | Removed; all scores in `votes` table                                                                                   |
+| Score entry        | Keypad for team reps                | Tap-to-vote (team reps); numeric inputs (Mentor / Previous marks only, §8.5)                                           |
+| Visual theme       | Dark sci-fi (Orbitron, neon)        | **Cartoon Game Leaderboard** (§7) — sky bg, chunky UI, Fredoka/Nunito                                                  |
 
 

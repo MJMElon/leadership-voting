@@ -37,15 +37,17 @@
       LV.voteLog.some(v => v.from === team.name)
     );
 
-    const mentorScoredTeams = new Set(
-      LV.voteLog
-        .filter(v => v.from === 'Mentor')
-        .map(v => LV.TEAMS.find(t => t.name === v.to)?.id)
-        .filter(id => id != null)
-    );
-    const mentorDone = LV.TEAMS.every(t => mentorScoredTeams.has(t.id));
+    const rolesDone = LV.ROLES.every(role => {
+      const scoredTeams = new Set(
+        LV.voteLog
+          .filter(v => v.from === role.fromTeam)
+          .map(v => LV.TEAMS.find(t => t.name === v.to)?.id)
+          .filter(id => id != null)
+      );
+      return LV.TEAMS.every(t => scoredTeams.has(t.id));
+    });
 
-    return teamVotesDone && mentorDone;
+    return teamVotesDone && rolesDone;
   };
 
   LV.buildSlotFromKey = function (slotKey) {

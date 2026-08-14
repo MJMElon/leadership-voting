@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Project Farmer Keynote Day 2026-07-18 Voting System</title>
+  <title>Project Farmer Final Keynote Day 2026-08-15 Voting System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/theme.css">
@@ -21,7 +21,7 @@
 <div id="auth-screen">
   <div class="page-header">
     <span class="trophy-icon">🏆</span>
-    <h1>PROJECT FARMER<br>KEYNOTE DAY 2026-07-18<br>VOTING SYSTEM</h1>
+    <h1>PROJECT FARMER<br>FINAL KEYNOTE DAY 2026-08-15<br>VOTING SYSTEM</h1>
     <p>Cast your marks &bull; Decide the champion</p>
   </div>
   <div class="auth-card">
@@ -81,7 +81,7 @@
   </div>
 
   <div class="page-header" style="padding:.5rem 1rem 1rem;">
-    <h1>PROJECT FARMER · KEYNOTE DAY 2026-07-18 · VOTING SYSTEM</h1>
+    <h1>PROJECT FARMER · FINAL KEYNOTE DAY 2026-08-15 · VOTING SYSTEM</h1>
   </div>
 
   <div id="interactive-display" class="interactive-display" hidden>
@@ -106,30 +106,34 @@
         <span class="qr-bg-sparkle qr-bg-sparkle-7">✦</span>
         <span class="qr-bg-sparkle qr-bg-sparkle-8">✧</span>
       </div>
-      <div class="interactive-voting-content">
-        <p class="qr-scan-caption">Scan the QR Code below and start voting.</p>
-        <div class="qr-stage" aria-label="Scan to vote">
-          <span class="qr-deco qr-deco-tl" aria-hidden="true">✨</span>
-          <span class="qr-deco qr-deco-tc" aria-hidden="true">🎊</span>
-          <span class="qr-deco qr-deco-tr" aria-hidden="true">🎉</span>
-          <span class="qr-deco qr-deco-ml" aria-hidden="true">🎁</span>
-          <span class="qr-deco qr-deco-l" aria-hidden="true">🌟</span>
-          <span class="qr-deco qr-deco-bl" aria-hidden="true">🎈</span>
-          <span class="qr-deco qr-deco-bc" aria-hidden="true">🗳️</span>
-          <span class="qr-deco qr-deco-br" aria-hidden="true">🏆</span>
-          <span class="qr-deco qr-deco-mr" aria-hidden="true">💫</span>
-          <span class="qr-deco qr-deco-r" aria-hidden="true">⭐</span>
-          <span class="qr-deco qr-deco-extra-1" aria-hidden="true">🏅</span>
-          <span class="qr-deco qr-deco-extra-2" aria-hidden="true">🎯</span>
-          <div class="qr-frame">
-            <div class="qr-frame-glow" aria-hidden="true"></div>
-            <div class="qr-frame-ring" aria-hidden="true"></div>
-            <img class="qr-image" src="images/vote-qr-code.png" alt="Vote QR code">
+      <div class="interactive-voting-scale-host">
+        <div class="interactive-voting-scale-wrap" id="interactive-voting-scale-wrap">
+          <div class="interactive-voting-scale-inner" id="interactive-voting-scale">
+            <p class="qr-scan-caption">Scan the QR Code below and start voting.</p>
+            <div class="qr-stage" aria-label="Scan to vote">
+              <span class="qr-deco qr-deco-tl" aria-hidden="true">✨</span>
+              <span class="qr-deco qr-deco-tc" aria-hidden="true">🎊</span>
+              <span class="qr-deco qr-deco-tr" aria-hidden="true">🎉</span>
+              <span class="qr-deco qr-deco-ml" aria-hidden="true">🎁</span>
+              <span class="qr-deco qr-deco-l" aria-hidden="true">🌟</span>
+              <span class="qr-deco qr-deco-bl" aria-hidden="true">🎈</span>
+              <span class="qr-deco qr-deco-bc" aria-hidden="true">🗳️</span>
+              <span class="qr-deco qr-deco-br" aria-hidden="true">🏆</span>
+              <span class="qr-deco qr-deco-mr" aria-hidden="true">💫</span>
+              <span class="qr-deco qr-deco-r" aria-hidden="true">⭐</span>
+              <span class="qr-deco qr-deco-extra-1" aria-hidden="true">🏅</span>
+              <span class="qr-deco qr-deco-extra-2" aria-hidden="true">🎯</span>
+              <div class="qr-frame">
+                <div class="qr-frame-glow" aria-hidden="true"></div>
+                <div class="qr-frame-ring" aria-hidden="true"></div>
+                <img class="qr-image" src="images/vote-qr-code.png" alt="Vote QR code">
+              </div>
+            </div>
+            <p class="voting-progress-text" id="voting-progress-text">Voting in progress...</p>
+            <button type="button" class="btn voting-done-btn" id="voting-done-btn" hidden
+              onclick="openWinnerAnnouncement()">Voting is done! And the overall winner is...</button>
           </div>
         </div>
-        <p class="voting-progress-text" id="voting-progress-text">Voting in progress...</p>
-        <button type="button" class="btn voting-done-btn" id="voting-done-btn" hidden
-          onclick="openWinnerAnnouncement()">Voting is done! And the winner is...</button>
       </div>
     </div>
   </div>
@@ -141,7 +145,7 @@
   </div>
 
   <div class="role-score-section interactive-only-hide" id="role-score-section">
-    <h2 id="role-score-title">🎓 Mentor Scoring</h2>
+    <h2 id="role-score-title">Scoring</h2>
     <p id="role-score-hint"></p>
     <div class="role-score-grid" id="role-score-grid"></div>
   </div>
@@ -157,7 +161,7 @@
       <div class="winner-caption is-hidden" id="winner-caption">
         <p class="winner-line">Congratulations to</p>
         <p class="winner-team" id="winner-team-label">Team 1</p>
-        <p class="winner-line">For winning today's keynote day!</p>
+        <p class="winner-line">As overall winner for Project Farmer!</p>
       </div>
       <div class="winner-lb-chart" id="winner-lb-chart" aria-label="Leaderboard"></div>
     </div>

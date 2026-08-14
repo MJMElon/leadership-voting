@@ -2,6 +2,9 @@
   const FADE_MS = 400;
   let votingDoneTimer = null;
   let votingUiDone = false;
+  let scaleRaf = null;
+  let scaleObserver = null;
+  let scaleBound = false;
 
   function panels() {
     return {
@@ -11,7 +14,106 @@
       mainApp: document.getElementById('main-app'),
       progressText: document.getElementById('voting-progress-text'),
       doneBtn: document.getElementById('voting-done-btn'),
+      scaleHost: document.querySelector('.interactive-voting-scale-host'),
+      scaleWrap: document.getElementById('interactive-voting-scale-wrap'),
+      scaleInner: document.getElementById('interactive-voting-scale'),
     };
+  }
+
+  function isVotingScreenActive() {
+    const { voting } = panels();
+    return !!voting?.classList.contains('is-active');
+  }
+
+  function resetInteractiveVotingScale() {
+    const { scaleWrap, scaleInner } = panels();
+    if (scaleWrap) {
+      scaleWrap.style.width = '';
+      scaleWrap.style.height = '';
+    }
+    if (scaleInner) {
+      scaleInner.style.transform = '';
+      scaleInner.style.width = '';
+    }
+  }
+
+  LV.fitInteractiveVotingScale = function () {
+    const { voting, scaleHost, scaleWrap, scaleInner } = panels();
+    if (!isVotingScreenActive() || !scaleHost || !scaleWrap || !scaleInner) {
+      resetInteractiveVotingScale();
+      return;
+    }
+
+    scaleWrap.style.width = '';
+    scaleWrap.style.height = '';
+    scaleInner.style.transform = 'none';
+    scaleInner.style.width = '';
+
+    const availW = scaleHost.clientWidth;
+    const availH = scaleHost.clientHeight;
+    if (availW <= 0 || availH <= 0) return;
+
+    const naturalW = scaleInner.offsetWidth;
+    const naturalH = scaleInner.offsetHeight;
+    if (naturalW <= 0 || naturalH <= 0) return;
+
+    const buffer = 12;
+    const scale = Math.min(
+      1,
+      (availW - buffer) / naturalW,
+      (availH - buffer) / naturalH
+    );
+
+    scaleInner.style.width = naturalW + 'px';
+    scaleInner.style.transform = 'scale(' + scale + ')';
+    scaleInner.style.transformOrigin = 'top left';
+    scaleWrap.style.width = (naturalW * scale) + 'px';
+    scaleWrap.style.height = (naturalH * scale) + 'px';
+  };
+
+  function scheduleFitInteractiveVotingScale() {
+    if (!isVotingScreenActive()) return;
+    if (scaleRaf) cancelAnimationFrame(scaleRaf);
+    scaleRaf = requestAnimationFrame(function () {
+      scaleRaf = requestAnimationFrame(function () {
+        scaleRaf = null;
+        LV.fitInteractiveVotingScale();
+      });
+    });
+  }
+
+  function bindInteractiveVotingScale() {
+    if (scaleBound) return;
+    const { scaleHost, voting, scaleInner } = panels();
+    if (!scaleHost || !voting || !scaleInner) return;
+
+    scaleBound = true;
+    scaleObserver = new ResizeObserver(function () {
+      scheduleFitInteractiveVotingScale();
+    });
+    scaleObserver.observe(scaleHost);
+    scaleObserver.observe(voting);
+
+    window.addEventListener('resize', scheduleFitInteractiveVotingScale);
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(scheduleFitInteractiveVotingScale);
+    }
+
+    const qrImg = scaleInner.querySelector('.qr-image');
+    if (qrImg && !qrImg.complete) {
+      qrImg.addEventListener('load', scheduleFitInteractiveVotingScale, { once: true });
+    }
+  }
+
+  function setInteractiveVotingActive(active) {
+    document.body.classList.toggle('interactive-voting-active', !!active);
+    if (active) {
+      bindInteractiveVotingScale();
+      scheduleFitInteractiveVotingScale();
+      return;
+    }
+    document.body.classList.remove('interactive-voting-active');
+    resetInteractiveVotingScale();
   }
 
   function wait(ms) {
@@ -39,6 +141,7 @@
       }
       votingUiDone = true;
       LV.playDoneVoteSound();
+      scheduleFitInteractiveVotingScale();
       return;
     }
 
@@ -58,6 +161,8 @@
     if (wasDone && LV.isInteractive() && LV.currentUser?.votingStarted) {
       LV.startVoteBgm();
     }
+
+    scheduleFitInteractiveVotingScale();
   }
 
   function activateReady(ready) {
@@ -76,11 +181,13 @@
     voting.removeAttribute('hidden');
     voting.classList.add('is-active');
     voting.classList.remove('is-fading-out');
+    setInteractiveVotingActive(true);
   }
 
   function deactivateVoting(voting) {
     if (!voting) return;
     voting.classList.remove('is-active', 'is-fading-out');
+    setInteractiveVotingActive(false);
   }
 
   LV.resetInteractiveVotingStatus = function () {
@@ -128,6 +235,7 @@
     if (!enabled) {
       deactivateReady(ready);
       deactivateVoting(voting);
+      setInteractiveVotingActive(false);
     }
   };
 
@@ -163,6 +271,7 @@
       deactivateReady(ready);
       activateVoting(voting);
       LV.updateInteractiveVotingStatus();
+      scheduleFitInteractiveVotingScale();
     });
   };
 

@@ -1,8 +1,6 @@
 (function (LV) {
   let pendingVoteTeamId = null;
 
-  const MENTOR_FROM = 'Mentor';
-
   function hideVotingSections(section, roleSection) {
     if (section) section.style.display = 'none';
     if (roleSection) roleSection.style.display = 'none';
@@ -31,10 +29,10 @@
       section.style.display = 'block';
       roleSection.style.display = 'none';
       renderTeamVoteCards(grid, { lockOwnTeam: true });
-    } else if (LV.currentUser.slot.roleId === 'mentor') {
+    } else if (LV.currentUser.slot.type === 'role') {
       section.style.display = 'none';
       roleSection.style.display = 'block';
-      renderMentorPanel();
+      renderRoleScorePanel();
     } else {
       hideVotingSections(section, roleSection);
     }
@@ -215,18 +213,21 @@
     }
   };
 
-  function renderMentorPanel() {
+  function renderRoleScorePanel() {
     renderRoleScoreInputs();
   }
 
   function renderRoleScoreInputs() {
-    const fromTeam = MENTOR_FROM;
+    const role = LV.currentUser.slot.role;
+    const fromTeam = role.fromTeam;
+    const limits = LV.getRoleScoreLimits(role);
     const locked = votingLocked();
+    const avatar = role.avatar || '🎓';
 
-    document.getElementById('role-score-title').textContent = '🎓 Mentor Scoring';
+    document.getElementById('role-score-title').textContent = avatar + ' ' + role.name + ' Scoring';
     document.getElementById('role-score-hint').textContent = locked
       ? 'Scoring is locked while the winner announcement is displayed.'
-      : 'Enter 0–8,000 marks per team and submit. Submitted rows lock — tap Undo to change a score.';
+      : 'Enter 0–' + limits.max.toLocaleString() + ' marks per team and submit. Submitted rows lock — tap Undo to change a score.';
 
     const grid = document.getElementById('role-score-grid');
     grid.innerHTML = '';
@@ -246,8 +247,8 @@
           (isLocked ? '<span class="rs-saved">Saved: ' + saved.toLocaleString() + '</span>' : '') +
         '</div>' +
         '<input type="number" class="role-score-inp' + (isLocked || locked ? ' is-locked' : '') + '" data-team-id="' + t.id + '"' +
-          ' min="' + LV.MENTOR_MIN_PTS + '" max="' + LV.MENTOR_MAX_PTS + '"' +
-          ' inputmode="numeric" placeholder="0" aria-label="Mentor score for ' + t.name + '"' +
+          ' min="' + limits.min + '" max="' + limits.max + '"' +
+          ' inputmode="numeric" placeholder="0" aria-label="' + role.name + ' score for ' + t.name + '"' +
           (isLocked || locked ? ' disabled' : '') +
           ' value="' + (isLocked ? saved : (draft ?? (saved != null ? saved : ''))) + '">' +
         (canUndo
@@ -320,12 +321,14 @@
     if (!inp || inp.disabled) return;
 
     let pts = parseInt(inp.value, 10);
+    const limits = LV.getRoleScoreLimits(LV.currentUser?.slot?.role);
     if (isNaN(pts) || pts < 0) pts = 0;
-    if (pts > LV.MENTOR_MAX_PTS) {
-      pts = LV.MENTOR_MAX_PTS;
+    if (pts > limits.max) {
+      pts = limits.max;
       inp.classList.add('input-error');
       if (!opts.silent) {
-        LV.showToast('Mentor max is ' + LV.MENTOR_MAX_PTS.toLocaleString() + ' per team', true);
+        const roleName = LV.currentUser?.slot?.role?.name || 'Role';
+        LV.showToast(roleName + ' max is ' + limits.max.toLocaleString() + ' per team', true);
       }
       setTimeout(() => inp.classList.remove('input-error'), 2000);
     }

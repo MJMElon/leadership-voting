@@ -87,9 +87,10 @@
       return;
     }
 
-    if (LV.currentUser.slot.roleId === 'mentor') {
+    if (LV.currentUser.slot.type === 'role') {
+      const fromTeam = LV.fromTeamForSlot(LV.currentUser.slot);
       LV.myRoleScores = {};
-      LV.voteLog.filter(v => v.email === LV.currentUser.email && v.from === 'Mentor').forEach(v => {
+      LV.voteLog.filter(v => v.email === LV.currentUser.email && v.from === fromTeam).forEach(v => {
         const tid = LV.TEAMS.find(t => t.name === v.to)?.id;
         if (tid != null) LV.setMyRoleScore(tid, v.pts);
       });

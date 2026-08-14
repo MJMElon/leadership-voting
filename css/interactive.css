@@ -1,7 +1,30 @@
 #main-app.interactive-mode {
   display: flex;
   flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
   min-height: 100dvh;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+body.interactive-voting-active {
+  overflow: hidden;
+}
+
+#main-app.interactive-mode .user-bar {
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
+}
+
+#main-app.interactive-mode .page-header {
+  flex-shrink: 0;
+  padding: 0.35rem 1rem 0.5rem;
+}
+
+#main-app.interactive-mode .page-header h1 {
+  font-size: clamp(0.78rem, 2.2vw, 1.05rem);
+  line-height: 1.25;
 }
 
 #main-app.interactive-mode .interactive-only-hide {
@@ -25,8 +48,9 @@
   justify-content: stretch;
   position: relative;
   width: 100%;
-  min-height: calc(100dvh - 10rem);
+  min-height: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 .interactive-display.is-visible {
@@ -54,7 +78,7 @@
   flex: 1;
   align-self: stretch;
   width: 100%;
-  min-height: 100%;
+  min-height: 0;
   opacity: 1;
 }
 
@@ -113,17 +137,32 @@
   min-width: 220px;
 }
 
-.interactive-voting-content {
+.interactive-voting-scale-host {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.interactive-voting-scale-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.interactive-voting-scale-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 1.5rem;
-  width: 100%;
-  min-height: 100%;
-  padding: 1.5rem 1rem 2rem;
-  position: relative;
-  z-index: 2;
+  width: min(920px, 100vw - 2rem);
+  padding: 0.5rem 1rem 1rem;
+  transform-origin: top left;
+  will-change: transform;
 }
 
 /* ── QR voting animated backgrounds ── */
@@ -297,7 +336,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(2rem, 5vw, 4rem);
+  padding: 3rem;
   width: 100%;
 }
 
@@ -343,7 +382,8 @@
 
 .qr-image {
   display: block;
-  width: min(62vw, 520px);
+  width: 480px;
+  max-width: 100%;
   height: auto;
   border-radius: 12px;
 }
@@ -393,18 +433,19 @@
 
 .voting-progress-text {
   font-family: var(--font-display);
-  font-size: clamp(1.4rem, 3.5vw, 2.4rem);
+  font-size: 2rem;
   font-weight: 700;
   color: var(--ink);
-  margin: 1rem 0 0;
+  margin: 0;
   animation: voting-progress-pulse 1.6s ease-in-out infinite;
 }
 
 .voting-done-btn {
   display: none;
-  margin: 1rem 0 0;
+  margin: 0;
   padding: 1.1rem 2rem;
-  width: min(100%, 640px);
+  width: 100%;
+  max-width: 640px;
   font-family: var(--font-display);
   font-size: clamp(1.2rem, 3.2vw, 2.2rem);
   font-weight: 700;

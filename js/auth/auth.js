@@ -7,11 +7,17 @@
     return LV.isInteractive();
   };
 
-  LV.isMentorUser = function () {
-    return LV.currentUser?.slot?.roleId === 'mentor';
+  LV.isRoleUser = function (roleId) {
+    return LV.currentUser?.slot?.roleId === roleId;
   };
 
-  const MENTOR_FROM = 'Mentor';
+  LV.isMentorUser = function () {
+    return LV.isRoleUser('mentor');
+  };
+
+  LV.isPreviousUser = function () {
+    return LV.isRoleUser('previous');
+  };
 
   function restoreMyVotes(user) {
     if (user.isInteractive || !user.slot) return;
@@ -25,40 +31,35 @@
       return;
     }
 
-    if (user.slot.roleId === 'mentor') {
-      LV.voteLog.filter(v => v.email === user.email && v.from === MENTOR_FROM).forEach(v => {
+    if (user.slot.type === 'role') {
+      const fromTeam = LV.fromTeamForSlot(user.slot);
+      LV.voteLog.filter(v => v.email === user.email && v.from === fromTeam).forEach(v => {
         const tid = LV.TEAMS.find(t => t.name === v.to)?.id;
         if (tid != null) LV.setMyRoleScore(tid, v.pts);
       });
     }
   }
 
-  async function ensureMentorSlots(email, name) {
-    const blocked = LV.MENTOR_SLOT_KEYS.some(k => {
-      const owner = LV.getSlotOwnerEmail(k);
-      return owner && owner !== email;
-    });
-    if (blocked) return false;
-
-    const ownsSlot = LV.MENTOR_SLOT_KEYS.every(k => LV.takenSlots[k] === email);
-    if (ownsSlot) return true;
-
-    return LV.dbLockMentorSlots(email, name);
+  async function ensureRoleSlot(role) {
+    const slotKey = 'role:' + role.id;
+    const email = role.keyword;
+    const owner = LV.getSlotOwnerEmail(slotKey);
+    if (owner && owner !== email) return false;
+    if (LV.takenSlots[slotKey] === email) return true;
+    return LV.dbLockRoleSlots([slotKey], email, role.name);
   }
 
-  async function finishMentorLogin() {
-    const email = LV.MENTOR_EMAIL;
-    const name = 'Mentor';
-    const ok = await ensureMentorSlots(email, name);
+  async function finishRoleLogin(role) {
+    const ok = await ensureRoleSlot(role);
     if (!ok) {
-      LV.showToast('Mentor slot already claimed by another user.', true);
+      LV.showToast(role.name + ' slot already claimed by another user.', true);
       return false;
     }
     await LV.finishLogin({
-      name,
-      email,
-      avatar: '🎓',
-      slot: LV.buildSlotFromKey('role:mentor'),
+      name: role.name,
+      email: role.keyword,
+      avatar: role.avatar,
+      slot: LV.buildSlotFromKey('role:' + role.id),
     });
     return true;
   }
@@ -81,8 +82,9 @@
       return true;
     }
 
-    if (saved.email === LV.MENTOR_EMAIL) {
-      return finishMentorLogin();
+    const savedRole = LV.findRoleByKeyword(saved.email);
+    if (savedRole) {
+      return finishRoleLogin(savedRole);
     }
 
     const name = saved.name || LV.nameFromEmail(saved.email);
@@ -122,9 +124,10 @@
       return;
     }
 
-    if (raw === LV.MENTOR_EMAIL) {
+    const keywordRole = LV.findRoleByKeyword(raw);
+    if (keywordRole) {
       await LV.loadFromSupabase();
-      await finishMentorLogin();
+      await finishRoleLogin(keywordRole);
       return;
     }
 
@@ -168,13 +171,14 @@
     } else {
       document.getElementById('u-avatar').textContent = user.slot.type === 'team'
         ? user.avatar
-        : '🎓';
+        : (user.slot.role?.avatar || user.avatar);
       document.getElementById('u-name').textContent = user.name;
 
       if (user.slot.type === 'team') {
         document.getElementById('u-team').textContent = user.slot.team.emoji + ' ' + user.slot.team.name;
       } else {
-        document.getElementById('u-team').textContent = user.slot.label;
+        document.getElementById('u-team').textContent =
+          (user.slot.role?.avatar ? user.slot.role.avatar + ' ' : '') + user.slot.label;
       }
     }
 
@@ -182,9 +186,6 @@
 
     if (!user.isInteractive && user.slot) {
       LV.takenSlots[user.slot.key] = user.email;
-      if (user.slot.roleId === 'mentor') {
-        LV.MENTOR_SLOT_KEYS.forEach(k => { LV.takenSlots[k] = user.email; });
-      }
       restoreMyVotes(user);
     }
 
